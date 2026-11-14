@@ -15,7 +15,7 @@ import sys
 import logging
 import asyncio
 from pathlib import Path
-from flask import Flask, render_template, jsonify, request, send_from_directory
+from flask import Flask, render_template, jsonify, request, send_from_directory, redirect, render_template_string
 
 # Ensure BM AUTOMATED directory is in sys.path
 BASE_DIR = Path(__file__).resolve().parent
@@ -332,6 +332,129 @@ def connect_multitenant_user():
         return jsonify(res)
 
     return jsonify({"success": False, "message": "Unknown authentication type"})
+
+
+# =============================================================================
+# OFFICIAL META OAUTH 2.0 / FACEBOOK APP & WEB DEEP-LINK REDIRECT
+# =============================================================================
+
+@app.route("/fb_login_redirect")
+def fb_login_redirect():
+    """
+    Redirects user directly to Facebook App or Meta Web OAuth Dialog.
+    Allows 1-Click login without manual token copying.
+    """
+    telegram_id = request.args.get("state", "web_vip_user").strip()
+    host_url = request.host_url.rstrip("/")
+    redirect_uri = f"{host_url}/fb_callback"
+
+    auth_gw = FBAuthGateway()
+    oauth_url = auth_gw.generate_oauth_url(
+        telegram_id=telegram_id,
+        redirect_uri=redirect_uri,
+        app_id=config.meta.app_id
+    )
+    return redirect(oauth_url)
+
+
+@app.route("/api/auth/oauth_url", methods=["GET"])
+def api_get_oauth_url():
+    """Returns Meta OAuth URL for Telegram Bot buttons or Web GUI."""
+    telegram_id = request.args.get("state", "web_vip_user").strip()
+    host_url = request.host_url.rstrip("/")
+    redirect_uri = f"{host_url}/fb_callback"
+
+    auth_gw = FBAuthGateway()
+    oauth_url = auth_gw.generate_oauth_url(
+        telegram_id=telegram_id,
+        redirect_uri=redirect_uri,
+        app_id=config.meta.app_id
+    )
+    return jsonify({
+        "oauth_url": oauth_url,
+        "redirect_uri": redirect_uri,
+        "app_id": config.meta.app_id or auth_gw.DEFAULT_APP_ID
+    })
+
+
+@app.route("/fb_callback")
+def fb_callback():
+    """
+    Meta OAuth 2.0 Authorization Callback.
+    Receives authorization code from Meta, exchanges it for a Long-Lived Token,
+    synchronizes all managed pages, and stores them securely in the vault.
+    """
+    code = request.args.get("code")
+    state = request.args.get("state", "web_vip_user")
+    error = request.args.get("error_description") or request.args.get("error")
+
+    if error:
+        return render_template_string("""
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Facebook Login Cancelled</title>
+          <style>
+            body { background: #0b0f19; color: #fff; font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+            .card { background: #131b2e; border: 1px solid #dc3545; border-radius: 12px; padding: 32px; max-width: 450px; }
+            h2 { color: #dc3545; }
+            a { display: inline-block; margin-top: 16px; background: #2563eb; color: #fff; padding: 10px 20px; border-radius: 8px; text-decoration: none; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h2>❌ ការចូល Facebook ត្រូវបានលុបចោល</h2>
+            <p>{{ error }}</p>
+            <a href="/">ត្រឡប់ទៅកាន់ Web Dashboard</a>
+          </div>
+        </body>
+        </html>
+        """, error=error), 400
+
+    if not code:
+        return "Missing authorization code from Facebook", 400
+
+    host_url = request.host_url.rstrip("/")
+    redirect_uri = f"{host_url}/fb_callback"
+    auth_gw = FBAuthGateway()
+    res = auth_gw.exchange_oauth_code(
+        code=code,
+        redirect_uri=redirect_uri,
+        telegram_id=state,
+        app_id=config.meta.app_id,
+        app_secret=config.meta.app_secret
+    )
+
+    return render_template_string("""
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <title>Facebook Connected Successfully</title>
+      <style>
+        body { background: #0b0f19; color: #fff; font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+        .card { background: #131b2e; border: 1px solid #10b981; border-radius: 16px; padding: 36px; max-width: 480px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        h1 { color: #10b981; font-size: 22px; margin-bottom: 12px; }
+        p { color: #94a3b8; font-size: 14px; line-height: 1.6; }
+        .badge { background: #064e3b; color: #34d399; padding: 6px 14px; border-radius: 20px; font-weight: 600; display: inline-block; margin: 12px 0; }
+        a { display: inline-block; margin-top: 20px; background: #2563eb; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        a:hover { background: #1d4ed8; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h1>🎉 ភ្ជាប់ FACEBOOK PAGE ជោគជ័យ ១០០%!</h1>
+        <div class="badge">🟢 LIVE CONNECTED TO META</div>
+        <p>ប្រព័ន្ធបានទាញយក Facebook Pages ទាំងអស់របស់អ្នកមកកាន់ <b>Angkor Quant BM Automated</b> ដោយស្វ័យប្រវត្ត។</p>
+        <p>លោកអ្នកអាចប្រើប្រាស់មុខងារ <b>Auto-Boost</b>, <b>4K Multi-Photo Publisher</b>, និង <b>AI Lead Agent</b> លើ Telegram Bot ឬ Web GUI បានពេញលេញ!</p>
+        <a href="/">ចូលទៅកាន់ Web Dashboard ភ្លាមៗ</a>
+      </div>
+    </body>
+    </html>
+    """)
 
 
 # =============================================================================

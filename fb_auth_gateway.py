@@ -13,6 +13,7 @@ directly from Telegram without dealing with Meta App ID, Secret, or Access Token
 ==============================================================================
 """
 
+import os
 import time
 import json
 import logging
@@ -179,18 +180,76 @@ class FBAuthGateway:
     # STRATEGY 2: 1-CLICK META OAUTH DIALOG
     # =========================================================================
 
-    def generate_oauth_url(self, telegram_id: str, redirect_uri: str = "https://angkorquant.ai/oauth/callback") -> str:
+    def generate_oauth_url(
+        self,
+        telegram_id: str,
+        redirect_uri: str = "https://angkorquant.ai/oauth/callback",
+        app_id: Optional[str] = None
+    ) -> str:
         """Generates 1-Click Official Meta Login Webview URL."""
         t_id = str(telegram_id).strip()
+        actual_app_id = (app_id or os.getenv("META_APP_ID", "")).strip() or self.DEFAULT_APP_ID
         scopes = "pages_show_list,pages_read_engagement,pages_manage_posts,pages_messaging,pages_read_user_content,ads_management,ads_read"
         return (
             f"https://www.facebook.com/{self.API_VERSION}/dialog/oauth"
-            f"?client_id={self.DEFAULT_APP_ID}"
+            f"?client_id={actual_app_id}"
             f"&redirect_uri={redirect_uri}"
             f"&scope={scopes}"
             f"&state={t_id}"
             f"&response_type=code"
         )
+
+    def exchange_oauth_code(
+        self,
+        code: str,
+        redirect_uri: str,
+        telegram_id: str = "web_user",
+        app_id: Optional[str] = None,
+        app_secret: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Exchanges Meta OAuth authorization code for Long-Lived Token and extracts all Managed Pages.
+        """
+        t_id = str(telegram_id).strip() or "web_user"
+        actual_app_id = (app_id or os.getenv("META_APP_ID", "")).strip() or self.DEFAULT_APP_ID
+        actual_app_secret = (app_secret or os.getenv("META_APP_SECRET", "")).strip()
+
+        # 1. Exchange code for short-lived user access token
+        url_token = f"{self.GRAPH_URL}/{self.API_VERSION}/oauth/access_token"
+        params = {
+            "client_id": actual_app_id,
+            "client_secret": actual_app_secret,
+            "redirect_uri": redirect_uri,
+            "code": code
+        }
+        try:
+            resp = requests.get(url_token, params=params, timeout=12)
+            if resp.status_code != 200:
+                logger.error(f"OAuth code exchange failed: {resp.text}")
+                return {"success": False, "message": f"Facebook OAuth error: {resp.text}"}
+            token_data = resp.json()
+            short_token = token_data.get("access_token")
+
+            # 2. Exchange for Long-Lived Token (60-day or perpetual)
+            long_token = short_token
+            if actual_app_secret:
+                url_long = f"{self.GRAPH_URL}/{self.API_VERSION}/oauth/access_token"
+                long_params = {
+                    "grant_type": "fb_exchange_token",
+                    "client_id": actual_app_id,
+                    "client_secret": actual_app_secret,
+                    "fb_exchange_token": short_token
+                }
+                long_resp = requests.get(url_long, params=long_params, timeout=12)
+                if long_resp.status_code == 200:
+                    long_token = long_resp.json().get("access_token", short_token)
+
+            # 3. Connect and save all pages into database vault
+            res = self.connect_with_token(t_id, long_token)
+            return res
+        except Exception as e:
+            logger.error(f"Error in OAuth code exchange: {e}")
+            return {"success": False, "message": f"Connection exception: {e}"}
 
     # =========================================================================
     # STRATEGY 3: DIRECT TOKEN / COOKIE 1-PASTE (/fb_token & /fb_cookie)

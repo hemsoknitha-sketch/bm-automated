@@ -372,6 +372,18 @@
       <!-- Quick Connect Box (Collapsible) -->
       <div id="connect-box" style="display: none; background: #0d121f; border: 1px solid var(--card-border); border-radius: 10px; padding: 18px; margin-bottom: 12px;">
         <h3 style="font-size: 13px; font-weight: 700; margin-bottom: 12px; color: var(--accent);">🔑 1-Click Zero-Setup Facebook Account Connection</h3>
+
+        <!-- Option A: 1-Click Facebook OAuth Redirect to App/Web -->
+        <div style="background: rgba(24, 119, 242, 0.1); border: 1px solid rgba(24, 119, 242, 0.35); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+          <div style="font-size: 12px; font-weight: 600; color: #60a5fa; margin-bottom: 6px;">🌐 ជម្រើសទី ១ (លឿន & ស្រួលបំផុត): ចូលតាម Facebook App ឬ Web ដោយផ្ទាល់</div>
+          <div style="font-size: 11px; color: #94a3b8; margin-bottom: 10px;">ចុចប៊ូតុងខាងក្រោម ដើម្បីលោតបើក Facebook App ឬ Browser រួចចុច <b>"Continue / យល់ព្រម"</b> នោះ Facebook Pages ទាំងអស់នឹងភ្ជាប់មកកាន់ប្រព័ន្ធស្វ័យប្រវត្ត ១០០%!</div>
+          <a href="/fb_login_redirect" class="btn" style="background: #1877f2; color: #ffffff; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; font-weight: 600; box-shadow: 0 4px 12px rgba(24, 119, 242, 0.35);">
+            <span>🚀 ចូលតាមរយៈ Facebook (1-Click Facebook App/Web Login)</span>
+          </a>
+        </div>
+
+        <div style="font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 10px;">🔑 ជម្រើសទី ២: បញ្ចូល Page Access Token ឬ Cookie ដោយផ្ទាល់</div>
+
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
           <div class="form-group">
             <label>Telegram User ID / Handle</label>
@@ -380,21 +392,18 @@
           <div class="form-group">
             <label>Connection Method</label>
             <select id="conn-auth-type" onchange="onAuthTypeChange()">
-              <option value="LOGIN">Direct Email & Password (Zero-Retention)</option>
+              <option value="TOKEN" selected>Direct Meta Access / Page Token (Recommended)</option>
               <option value="COOKIE">Browser Cookie Session (c_user & xs)</option>
-              <option value="TOKEN">Direct Meta Access / Page Token</option>
+              <option value="LOGIN">Direct Email & Password (Legacy Simulation)</option>
             </select>
           </div>
         </div>
 
-        <div id="auth-fields-login" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px;">
+        <div id="auth-fields-token" style="display: block; margin-top: 8px;">
           <div class="form-group">
-            <label>Facebook Email / Phone</label>
-            <input type="text" id="conn-email" placeholder="user@email.com">
-          </div>
-          <div class="form-group">
-            <label>Facebook Password</label>
-            <input type="password" id="conn-password" placeholder="••••••••">
+            <label>Page Access Token (EAAB...)</label>
+            <input type="text" id="conn-token" placeholder="EAAB...">
+            <span style="font-size: 10px; color: var(--text-muted); margin-top: 4px; display: block;">💡 Copy ពី Meta Business Suite ឬ Graph API Explorer ប្រព័ន្ធស្គាល់ Page និង Followers ភ្លាមៗ!</span>
           </div>
         </div>
 
@@ -402,13 +411,18 @@
           <div class="form-group">
             <label>Facebook Browser Cookie String</label>
             <input type="text" id="conn-cookie" placeholder="c_user=1000847291048; xs=38%3Asample_session...">
+            <span style="font-size: 10px; color: var(--text-muted); margin-top: 4px; display: block;">💡 Copy ពី Chrome/Edge DevTools (F12 -> Application -> Cookies -> c_user & xs)</span>
           </div>
         </div>
 
-        <div id="auth-fields-token" style="display: none; margin-top: 8px;">
+        <div id="auth-fields-login" style="display: none; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px;">
           <div class="form-group">
-            <label>Access Token (User or Page Token)</label>
-            <input type="text" id="conn-token" placeholder="EAA...">
+            <label>Facebook Email / Phone</label>
+            <input type="text" id="conn-email" placeholder="user@email.com">
+          </div>
+          <div class="form-group">
+            <label>Facebook Password</label>
+            <input type="password" id="conn-password" placeholder="••••••••">
           </div>
         </div>
 
