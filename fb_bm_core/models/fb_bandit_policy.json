@@ -1,0 +1,30 @@
+{
+  "ad1": {
+    "adset_id": "adset1",
+    "last_spend": 3.5,
+    "last_roas": 1.1,
+    "last_clicks": 0,
+    "last_cpc": 0.0
+  },
+  "ad2": {
+    "adset_id": "adset2",
+    "last_spend": 12.0,
+    "last_roas": 3.8,
+    "last_clicks": 0,
+    "last_cpc": 0.0
+  },
+  "ad3": {
+    "adset_id": "adset3",
+    "last_spend": 10.0,
+    "last_roas": 0.85,
+    "last_clicks": 0,
+    "last_cpc": 0.0
+  },
+  "mock_ad_651403": {
+    "adset_id": "mock_adset_651403",
+    "last_spend": 12.5,
+    "last_roas": 3.42,
+    "last_clicks": 168,
+    "last_cpc": 0.074
+  }
+}

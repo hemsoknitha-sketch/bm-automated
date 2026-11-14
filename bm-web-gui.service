@@ -5,12 +5,12 @@ After=network.target
 [Service]
 Type=simple
 User=hemsoknitha
-WorkingDirectory=/home/hemsoknitha/BM_AUTOMATED
-EnvironmentFile=-/home/hemsoknitha/BM_AUTOMATED/.env
+WorkingDirectory=/home/hemsoknitha/bm-automated
+EnvironmentFile=-/home/hemsoknitha/bm-automated/.env
 Environment=PYTHONIOENCODING=utf-8
 Environment=LC_ALL=C.UTF-8
 Environment=LANG=C.UTF-8
-ExecStart=/home/hemsoknitha/BM_AUTOMATED/venv/bin/python3 web_dashboard.py
+ExecStart=/home/hemsoknitha/bm-automated/venv/bin/python3 web_dashboard.py
 Restart=always
 RestartSec=10
 

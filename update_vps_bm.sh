@@ -20,6 +20,12 @@ echo "📦 Step 1: Pulling latest code..."
 git fetch origin main
 git reset --hard origin/main
 
+if [ "${BM_REEXECED:-0}" != "1" ]; then
+    export BM_REEXECED=1
+    echo "🔄 Re-executing freshly updated update_vps_bm.sh..."
+    exec bash "$DIR/update_vps_bm.sh" "$@"
+fi
+
 # 2. Update dependencies if needed
 if [ -f "requirements.txt" ]; then
     echo "📦 Step 2: Updating dependencies (zero-cache mode)..."
@@ -52,26 +58,24 @@ if sudo -n true 2>/dev/null || sudo true 2>/dev/null; then
 fi
 
 if [ "$CAN_SUDO" -eq 1 ]; then
-    # Ensure systemd services are installed and up to date
-    if [ ! -f "/etc/systemd/system/bm-automated.service" ] || [ ! -f "/etc/systemd/system/bm-web-gui.service" ] || [ ! -f "/etc/systemd/system/bm-bot.service" ]; then
-        echo "⚙️ Configuring and installing Systemd services into /etc/systemd/system/..."
-        for svc in bm-automated.service bm-web-gui.service bm-bot.service; do
-            if [ -f "$svc" ]; then
-                sed -e "s|^User=.*|User=${CURRENT_USER}|g" \
-                    -e "s|^WorkingDirectory=.*|WorkingDirectory=${DIR}|g" \
-                    -e "s|^EnvironmentFile=-.*|EnvironmentFile=-${DIR}/.env|g" \
-                    -e "s|ExecStart=.*run_bm_automated.py|ExecStart=${PYTHON_BIN} run_bm_automated.py|g" \
-                    -e "s|ExecStart=.*web_dashboard.py|ExecStart=${PYTHON_BIN} web_dashboard.py|g" \
-                    -e "s|ExecStart=.*bm_telegram_bot.py|ExecStart=${PYTHON_BIN} bm_telegram_bot.py|g" \
-                    "$svc" > "/tmp/${svc}"
-                sudo cp "/tmp/${svc}" "/etc/systemd/system/${svc}"
-                rm -f "/tmp/${svc}"
-                echo "   • Installed /etc/systemd/system/${svc}"
-            fi
-        done
-        sudo systemctl daemon-reload
-        sudo systemctl enable bm-automated.service bm-web-gui.service bm-bot.service 2>/dev/null || true
-    fi
+    # Ensure systemd services are installed and kept in sync with latest repo config
+    echo "⚙️ Configuring and installing Systemd services into /etc/systemd/system/..."
+    for svc in bm-automated.service bm-web-gui.service bm-bot.service; do
+        if [ -f "$svc" ]; then
+            sed -e "s|^User=.*|User=${CURRENT_USER}|g" \
+                -e "s|^WorkingDirectory=.*|WorkingDirectory=${DIR}|g" \
+                -e "s|^EnvironmentFile=-.*|EnvironmentFile=-${DIR}/.env|g" \
+                -e "s|ExecStart=.*run_bm_automated.py.*|ExecStart=${PYTHON_BIN} run_bm_automated.py --daemon --interval 300|g" \
+                -e "s|ExecStart=.*web_dashboard.py.*|ExecStart=${PYTHON_BIN} web_dashboard.py|g" \
+                -e "s|ExecStart=.*bm_telegram_bot.py.*|ExecStart=${PYTHON_BIN} bm_telegram_bot.py|g" \
+                "$svc" > "/tmp/${svc}"
+            sudo cp "/tmp/${svc}" "/etc/systemd/system/${svc}"
+            rm -f "/tmp/${svc}"
+            echo "   • Synchronized /etc/systemd/system/${svc}"
+        fi
+    done
+    sudo systemctl daemon-reload
+    sudo systemctl enable bm-automated.service bm-web-gui.service bm-bot.service 2>/dev/null || true
 
     echo "🔄 Restarting 24/7 services under Systemd..."
     sudo systemctl restart bm-automated.service || true
