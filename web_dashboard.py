@@ -380,15 +380,27 @@ def fb_login_redirect():
           <div class="card">
             <h2>⚠️ ត្រូវការ Meta App ID សម្រាប់ Facebook 1-Click Login</h2>
             <div class="alert-box">
-              ការចុចចូលតាម Facebook OAuth តម្រូវឱ្យមាន <b>Meta App ID</b> របស់បងដែលបានចុះឈ្មោះលើ <a href="https://developers.facebook.com" target="_blank" style="color: #60a5fa;">developers.facebook.com</a>។
+              🛡️ <b>ហេតុអ្វីបានជា Facebook ត្រូវការ Meta App ID?</b><br>
+              Facebook (Meta) មានប្រព័ន្ធសុវត្ថិភាព <b>Browser Sandbox & Same-Origin</b> យ៉ាងតឹងរ៉ឹង។ Website ឬ Server ខាងក្រៅមិនអាចលួចអាន Session/Cookie នៃគណនី Facebook ដែលកំពុង Login លើ Browser បានឡើយ (ដើម្បីការពារការលួចគណនី)។ ដូច្នេះការចុច Login តាម OAuth តម្រូវឱ្យមាន <b>Meta App ID</b> ជាផ្លូវការពី <a href="https://developers.facebook.com" target="_blank" style="color: #60a5fa;">developers.facebook.com</a>។
             </div>
 
             <div class="step-box" style="border-left: 4px solid #10b981;">
-              <div class="step-title">🌟 ជម្រើសទី ១ (លឿន & ស្រួលបំផុត - មិនបាច់បង្កើត App ID ឡើយ!):</div>
-              <p style="margin: 6px 0 10px 0; color: #cbd5e1;">គ្រាន់តែ Copy យក <b>Page Access Token</b> ពី <a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color: #38bdf8;">Graph API Explorer</a> មក Paste នៅទីនេះ ប្រព័ន្ធនឹងស្គាល់ Page របស់បងភ្លាមៗ ១០០%!</p>
+              <div class="step-title">🌟 ជម្រើសទី ១ (លឿន & ស្រួលបំផុត - ត្រឹមតែ ១០ វិនាទី មិនបាច់បង្កើត App ID ឡើយ!):</div>
+              <p style="margin: 6px 0; color: #cbd5e1;">បងអាចយក <b>Page Access Token</b> ពី Facebook ផ្ទាល់ដោយងាយស្រួលបំផុត៖</p>
+              
+              <a href="https://developers.facebook.com/tools/explorer/" target="_blank" class="btn" style="background: #2563eb; width: 100%; box-sizing: border-box; text-align: center; margin: 8px 0; font-size: 14px;">
+                🔗 ១. ចុចទីនេះដើម្បីបើក Graph API Explorer
+              </a>
+
+              <div style="background: #0f172a; padding: 10px; border-radius: 6px; font-size: 12px; line-height: 1.6; color: #94a3b8; margin-bottom: 10px;">
+                • ២. នៅត្រង់ប្រអប់ <b>"User or Page"</b> (ខាងស្តាំដៃ) -> សូមរើសយក <b>Page របស់បង</b><br>
+                • ៣. ចុច Copy កូដវែងក្នុងប្រអប់ <b>"Access Token"</b> (ផ្តើមដោយ <code>EAAB...</code>)<br>
+                • ៤. យកមក Paste ក្នុងប្រអប់ខាងក្រោម រួចចុច <b>"ភ្ជាប់ Page ភ្លាមៗ"</b>!
+              </div>
+
               <form id="token-form" onsubmit="submitToken(event)">
                 <input type="text" id="direct-token" placeholder="Paste Page Access Token (EAAB...)" required>
-                <button type="submit" class="btn btn-accent" style="width: 100%; margin-top: 6px;">⚡ ភ្ជាប់ Page ភ្លាមៗ (Connect Now)</button>
+                <button type="submit" class="btn btn-accent" style="width: 100%; margin-top: 6px; font-size: 14px;">⚡ ភ្ជាប់ Page ភ្លាមៗ (Connect Now)</button>
               </form>
               <div id="token-status" style="margin-top: 8px; font-size: 12px; display: none;"></div>
             </div>

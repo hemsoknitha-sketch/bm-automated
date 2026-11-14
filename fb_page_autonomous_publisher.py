@@ -525,6 +525,29 @@ class PageAutonomousPublisherEngine:
         )
         self.multi_tenant.update_last_auto_post_time(page_id)
 
+        if client.is_mock:
+            summary_khmer = (
+                f"🧪 <b>[MOCK SIMULATION - មិនទាន់ផ្សាយទៅ Facebook ពិតឡើយ]</b>\n"
+                f"────────────────────────────\n"
+                f"• <b>Status:</b> កំពុងដំណើរការក្នុង Mock Mode (មិនទាន់មាន Page Access Token ពិតប្រាកដ)\n"
+                f"• <b>ផលិតផលគំរូ:</b> <b>{bundle.product_name}</b>\n"
+                f"• <b>រូបភាព 4K Studio:</b> <b>{len(enhanced_photos)} សន្លឹក</b>\n"
+                f"• <b>ចំណងជើង:</b> <i>\"{headline}\"</i>\n"
+                f"• <b>Hook Power:</b> <b>{hook_score}/100</b> (Grade: <b>{copy_grade}</b>)\n"
+                f"────────────────────────────\n"
+                f"⚠️ <i>ដើម្បីបង្ហោះមាតិកាទៅកាន់ Facebook Page ពិតប្រាកដ សូមភ្ជាប់ Page Access Token របស់លោកអ្នកតាម /token &lt;Token&gt;</i>"
+            )
+            return {
+                "success": True,
+                "is_mock": True,
+                "post_id": post_id,
+                "post_url": "",
+                "photo_count": len(enhanced_photos),
+                "headline": headline,
+                "caption": caption,
+                "summary_khmer": summary_khmer
+            }
+
         summary_khmer = (
             f"🎉 <b>4K VIRAL CAMPAIGN PUBLISHED TO FACEBOOK!</b>\n"
             f"────────────────────────────\n"

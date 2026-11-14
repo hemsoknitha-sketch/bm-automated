@@ -93,6 +93,11 @@ def check_autonomous_publishing():
         active_auto_pages = mt_mgr.get_active_auto_publish_pages()
         now_ts = time.time()
         for p in active_auto_pages:
+            p_tok = p.get("page_token") or config.meta.access_token
+            # Strict Isolation Guard: Never auto-publish fake campaigns to mock/unconnected pages in background daemon
+            if not p_tok or p_tok.startswith(("MOCK_", "SIM_", "TEST_", "EAA_PAGE_TOKEN_")) or config.meta.is_mock:
+                continue
+
             interval_sec = int(p.get("publish_interval_hours", 2)) * 3600
             last_time = float(p.get("last_auto_post_time", 0))
             if (now_ts - last_time) >= interval_sec:
@@ -101,11 +106,11 @@ def check_autonomous_publishing():
                 p_name = p.get("page_name", p_id)
                 logger.info(f"⏰ [DAEMON SCHEDULE] Time to publish for Page [{p_name}] ({p_id})!")
                 p_client = MetaGraphAPIClient(
-                    access_token=p.get("page_token") or config.meta.access_token,
+                    access_token=p_tok,
                     page_id=p_id,
                     ad_account_id=config.meta.ad_account_id,
                     api_version=config.meta.api_version,
-                    is_mock=config.meta.is_mock
+                    is_mock=False
                 )
                 res = pub_engine.execute_scheduled_publishing_cycle(
                     client=p_client,

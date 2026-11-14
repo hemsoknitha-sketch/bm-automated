@@ -233,12 +233,13 @@ class BMTelegramBot:
         if active_page:
             page_badge = f"📄 <b>{active_page['page_name']}</b> (<code>{active_page['page_id']}</code>)"
             followers_txt = f"• <b>Followers:</b> <code>{active_page.get('followers_count', 0):,}</code>\n"
+            mode_badge = "🟢 <b>LIVE FACEBOOK PAGE</b>"
         else:
-            page_badge = f"<code>{config.meta.page_id}</code> (Default)"
+            page_badge = "🔴 <b>មិនទាន់ភ្ជាប់ Page (No Page Connected)</b>"
             followers_txt = ""
+            mode_badge = "⚪ <b>STANDBY (រង់ចាំការភ្ជាប់ Page)</b>"
 
-        mode_badge = "🛡️ <b>MOCK SIMULATION</b>" if self.api_client.is_mock else "🟢 <b>LIVE META GRAPH API</b>"
-        autopilot_badge = "🟢 <b>ACTIVE</b>" if self.autopilot_enabled else "🔴 <b>PAUSED</b>"
+        autopilot_badge = "🟢 <b>ACTIVE</b>" if (self.autopilot_enabled and active_page) else "🔴 <b>PAUSED</b>"
 
         msg = (
             "🚀 <b>FB PAGE BM AUTOMATED - SUPER SMART BOT</b>\n"
@@ -256,14 +257,18 @@ class BMTelegramBot:
         )
 
         buttons = []
-        if user:
+        if active_page:
             buttons.append([
                 {"text": "📄 រើស Page របស់បង (/fb_pages)", "callback_data": "cmd_fb_pages"},
                 {"text": "🔍 Scan Posts", "callback_data": "cmd_scan"}
             ])
             buttons.append([
-                {"text": "⚡ Active Boosts", "callback_data": "cmd_active"},
-                {"text": "🤖 Toggle Autopilot", "callback_data": "cmd_toggle_autopilot"}
+                {"text": "🎨 4K Multi-Photo", "callback_data": "cmd_autopub"},
+                {"text": "⚡ Publish 4K Now", "callback_data": f"pubnow_{active_page['page_id']}"}
+            ])
+            buttons.append([
+                {"text": "🚀 Offline Boost ($0)", "callback_data": "cmd_test_offline_boost"},
+                {"text": "💬 Comments & Chat", "callback_data": "cmd_comments"}
             ])
             buttons.append([
                 {"text": "📊 Live ROAS Scorecard", "callback_data": "cmd_roas"},
@@ -271,12 +276,17 @@ class BMTelegramBot:
             ])
         else:
             buttons.append([
-                {"text": "🔑 ភ្ជាប់ Facebook របស់បង (/fb_login)", "callback_data": "cmd_fb_login_guide"},
-                {"text": "🔍 Scan Default Posts", "callback_data": "cmd_scan"}
+                {"text": "🔑 ភ្ជាប់ Facebook Page (10 វិនាទី)", "callback_data": "help_token_guide"}
             ])
             buttons.append([
-                {"text": "⚡ Active Boosted Ads", "callback_data": "cmd_active"},
-                {"text": "🤖 Toggle Autopilot", "callback_data": "cmd_toggle_autopilot"}
+                {"text": "🔗 ភ្ជាប់តាម Web Dashboard", "url": self._get_effective_web_url() + "/fb_login_redirect"}
+            ])
+            buttons.append([
+                {"text": "🚀 សាកល្បង Offline Boost ($0)", "callback_data": "cmd_test_offline_boost"},
+                {"text": "🧪 សាកល្បង AI Copy Simulator", "callback_data": "cmd_test_simulate"}
+            ])
+            buttons.append([
+                {"text": "❓ ហេតុអ្វីត្រូវភ្ជាប់ Page Token?", "callback_data": "help_why_token"}
             ])
 
         if self.admin_id and str(chat_id) == str(self.admin_id):
@@ -303,7 +313,23 @@ class BMTelegramBot:
     def handle_scan(self, chat_id: str):
         """Scans page posts, evaluates viral momentum & presents 1-tap Boost buttons."""
         client, active_rec = self.auth_gateway.get_user_page_client(chat_id)
-        page_name = active_rec.page_name if active_rec else config.meta.page_id
+        if not active_rec or not active_rec.page_id or client.is_mock:
+            self.send_message(
+                chat_id,
+                "ℹ️ <b>លោកអ្នកមិនទាន់បានភ្ជាប់ Facebook Page នៅឡើយទេ!</b>\n\n"
+                "មុខងារ <b>Scan Posts & Auto-Boost</b> ផ្តោតលើការតាមដានទិន្នន័យពិតប្រាកដ។ "
+                "សូមភ្ជាប់ Facebook Page របស់លោកអ្នកជាមុនសិនតាមរយៈបញ្ជា <code>/token &lt;Token&gt;</code> "
+                "ឬចុចប៊ូតុងខាងក្រោមដើម្បីមើលការណែនាំយក Token ក្នុងរយៈពេល ១០ វិនាទី!",
+                reply_markup={
+                    "inline_keyboard": [
+                        [{"text": "🔑 របៀបយក Page Token (10 វិនាទី)", "callback_data": "help_token_guide"}],
+                        [{"text": "🔗 ភ្ជាប់តាម Web Dashboard", "url": self._get_effective_web_url() + "/fb_login_redirect"}]
+                    ]
+                }
+            )
+            return
+
+        page_name = active_rec.page_name
         self.send_message(chat_id, f"⏳ <b>កំពុងស្កេន Facebook Page Posts លើ: {page_name}...</b>")
         posts = client.get_page_posts(limit=6)
 
@@ -468,8 +494,23 @@ class BMTelegramBot:
         budget = float(args[1]) if len(args) > 1 else config.policy.test_daily_budget_usd
 
         client, active_rec = self.auth_gateway.get_user_page_client(chat_id)
-        target_page_id = client.page_id
-        page_name = active_rec.page_name if active_rec else target_page_id
+        if not active_rec or not active_rec.page_id or client.is_mock:
+            self.send_message(
+                chat_id,
+                "⚠️ <b>លោកអ្នកមិនទាន់បានភ្ជាប់ Facebook Page នៅឡើយទេ!</b>\n\n"
+                "មុខងារ <b>Boost Post</b> តម្រូវឱ្យភ្ជាប់ Facebook Page ផ្ទាល់ខ្លួនជាមុនសិន។ "
+                "សូមភ្ជាប់ Page តាមរយៈ <code>/token &lt;Token&gt;</code>!",
+                reply_markup={
+                    "inline_keyboard": [
+                        [{"text": "🔑 របៀបយក Page Token (10 វិនាទី)", "callback_data": "help_token_guide"}],
+                        [{"text": "🔗 ភ្ជាប់តាម Web Dashboard", "url": self._get_effective_web_url() + "/fb_login_redirect"}]
+                    ]
+                }
+            )
+            return
+
+        target_page_id = active_rec.page_id
+        page_name = active_rec.page_name
 
         posts = client.get_page_posts(limit=25)
         target = next((p for p in posts if p.post_id == post_id), None)
@@ -527,6 +568,18 @@ class BMTelegramBot:
             self.send_message(chat_id, f"🤖 <b>Autopilot Status:</b> {state}")
         elif data == "cmd_help":
             self.handle_help(chat_id)
+        elif data == "help_token_guide":
+            self.handle_token_guide(chat_id)
+        elif data == "help_why_token":
+            self.handle_why_token(chat_id)
+        elif data == "cmd_test_simulate":
+            self.handle_simulate_text(chat_id, "🔥 ស្បែកជើងសុភាពនារីម៉ូដថ្មី ២០២៦ គុណភាពខ្ពស់ស្តង់ដារអន្តរជាតិ! បញ្ចុះតម្លៃ 30% ថ្ងៃនេះ!")
+        elif data == "cmd_test_offline_boost":
+            self.handle_offline_boost(chat_id, "ស្បែកជើងសុភាពនារី ម៉ូដថ្មី ២០២៦")
+        elif data == "cmd_autopub":
+            self.handle_auto_publish(chat_id, "/auto_publish")
+        elif data == "cmd_comments":
+            self.handle_comments_status(chat_id)
         elif data == "cmd_fb_pages":
             self.handle_fb_pages(chat_id)
         elif data == "cmd_fb_login_guide":
@@ -612,20 +665,34 @@ class BMTelegramBot:
                 self.send_message(chat_id, "⚠️ មិនមាន Offline Boost Package សកម្មឡើយ។ សូមបង្កើតឡើងវិញតាម /offline_boost <topic>")
             else:
                 client, active_rec = self.auth_gateway.get_user_page_client(chat_id)
-                res = self.offline_boost_engine.publish_package_to_page(pkg, client)
-                p_name = active_rec.page_name if active_rec else client.page_id
-                if res.get("success"):
+                if not active_rec or not active_rec.page_id or client.is_mock:
                     self.send_message(
                         chat_id,
-                        f"🎉 <b>បានផ្សាយ OFFLINE BOOST ទៅកាន់ PAGE [{p_name}]!</b>\n"
-                        f"• <b>Post ID:</b> <code>{res['post_id']}</code>\n"
-                        f"• <b>Cost:</b> <b>$0.00 (Zero Ad Spend)</b>\n"
-                        f"• <b>Viral Hook:</b> <b>{pkg.hook_score}/100</b> (Grade: {pkg.copy_grade})\n"
-                        f"• <b>Status:</b> 🟢 <b>LIVE & ORGANIC REACH RISING!</b>\n"
-                        f"<i>ប្រព័ន្ធបានរៀបចំរួចរាល់ដើម្បីទាក់ទាញ Organic Reach រាប់ម៉ឺននាក់!</i>"
+                        "⚠️ <b>លោកអ្នកមិនទាន់បានភ្ជាប់ Facebook Page នៅឡើយទេ!</b>\n\n"
+                        "Banner 4K និងអត្ថបទត្រូវបានបង្កើតរួចរាល់ហើយ ប៉ុន្តែដើម្បីបង្ហោះផ្ទាល់ទៅកាន់ Page "
+                        "សូមភ្ជាប់ Facebook Page របស់លោកអ្នកជាមុនសិនតាមរយៈ <code>/token &lt;Token&gt;</code>។",
+                        reply_markup={
+                            "inline_keyboard": [
+                                [{"text": "🔑 របៀបយក Page Token (10 វិនាទី)", "callback_data": "help_token_guide"}],
+                                [{"text": "🔗 ភ្ជាប់តាម Web Dashboard", "url": self._get_effective_web_url() + "/fb_login_redirect"}]
+                            ]
+                        }
                     )
                 else:
-                    self.send_message(chat_id, res.get("message", "Error"))
+                    res = self.offline_boost_engine.publish_package_to_page(pkg, client)
+                    p_name = active_rec.page_name
+                    if res.get("success"):
+                        self.send_message(
+                            chat_id,
+                            f"🎉 <b>បានផ្សាយ OFFLINE BOOST ទៅកាន់ PAGE [{p_name}]!</b>\n"
+                            f"• <b>Post ID:</b> <code>{res['post_id']}</code>\n"
+                            f"• <b>Cost:</b> <b>$0.00 (Zero Ad Spend)</b>\n"
+                            f"• <b>Viral Hook:</b> <b>{pkg.hook_score}/100</b> (Grade: {pkg.copy_grade})\n"
+                            f"• <b>Status:</b> 🟢 <b>LIVE & ORGANIC REACH RISING!</b>\n"
+                            f"<i>ប្រព័ន្ធបានរៀបចំរួចរាល់ដើម្បីទាក់ទាញ Organic Reach រាប់ម៉ឺននាក់!</i>"
+                        )
+                    else:
+                        self.send_message(chat_id, res.get("message", "Error"))
         elif data.startswith("view_caption_"):
             target_chat = data.replace("view_caption_", "")
             pkg = self._last_offline_packages.get(target_chat)
@@ -731,7 +798,21 @@ class BMTelegramBot:
             return
 
         client, active_rec = self.auth_gateway.get_user_page_client(chat_id)
-        p_name = active_rec.page_name if active_rec else config.meta.page_id
+        if not active_rec or not active_rec.page_id or client.is_mock:
+            self.send_message(
+                chat_id,
+                "⚠️ <b>លោកអ្នកមិនទាន់បានភ្ជាប់ Facebook Page នៅឡើយទេ!</b>\n\n"
+                "សូមភ្ជាប់ Facebook Page របស់លោកអ្នកជាមុនសិនតាមរយៈ <code>/token &lt;Token&gt;</code> ដើម្បី Post ទៅកាន់ Page។",
+                reply_markup={
+                    "inline_keyboard": [
+                        [{"text": "🔑 របៀបយក Page Token (10 វិនាទី)", "callback_data": "help_token_guide"}],
+                        [{"text": "🔗 ភ្ជាប់តាម Web Dashboard", "url": self._get_effective_web_url() + "/fb_login_redirect"}]
+                    ]
+                }
+            )
+            return
+
+        p_name = active_rec.page_name
         res = client.publish_page_post(message, image_url)
         if "error" in res:
             self.send_message(chat_id, f"❌ <b>បរាជ័យក្នុងការ Post៖</b> {res['error']}")
@@ -748,9 +829,26 @@ class BMTelegramBot:
 
     def handle_comments_status(self, chat_id: str):
         """Displays 24/7 AI Comment & Messenger Lead Assistant status."""
+        client, active_rec = self.auth_gateway.get_user_page_client(chat_id)
+        if not active_rec or not active_rec.page_id or client.is_mock:
+            self.send_message(
+                chat_id,
+                "⚠️ <b>លោកអ្នកមិនទាន់បានភ្ជាប់ Facebook Page នៅឡើយទេ!</b>\n\n"
+                "មុខងារ <b>24/7 AI Comment & Messenger Patrol</b> តម្រូវឱ្យភ្ជាប់ Facebook Page របស់លោកអ្នកជាមុនសិន។",
+                reply_markup={
+                    "inline_keyboard": [
+                        [{"text": "🔑 របៀបយក Page Token (10 វិនាទី)", "callback_data": "help_token_guide"}],
+                        [{"text": "🔗 ភ្ជាប់តាម Web Dashboard", "url": self._get_effective_web_url() + "/fb_login_redirect"}]
+                    ]
+                }
+            )
+            return
+
+        p_name = active_rec.page_name
         active_count = len(self.orchestrator.active_boosts)
         msg = (
-            "🤖 <b>24/7 AI COMMENT & MESSENGER LEAD AGENT</b>\n"
+            f"🤖 <b>24/7 AI COMMENT & MESSENGER LEAD AGENT</b>\n"
+            f"• <b>Target Page:</b> <b>{p_name}</b> (<code>{active_rec.page_id}</code>)\n"
             "────────────────────────────\n"
             f"• <b>Status:</b> 🟢 <b>ACTIVE & MONITORING</b>\n"
             f"• <b>Monitored Boosted Posts:</b> <code>{active_count}</code>\n"
@@ -962,15 +1060,85 @@ class BMTelegramBot:
         self.send_message(chat_id, msg, reply_markup=keyboard)
 
     def handle_fb_token(self, chat_id: str, text: str):
-        """Processes /fb_token <token> command."""
+        """Processes /fb_token <token> or /token <token> command."""
         parts = text.split()
         if len(parts) < 2:
-            self.send_message(chat_id, "⚠️ <b>ទម្រង់ប្រើប្រាស់៖</b> <code>/fb_token &lt;access_token&gt;</code>")
+            self.send_message(
+                chat_id,
+                "⚠️ <b>ទម្រង់ប្រើប្រាស់៖</b> <code>/token &lt;access_token&gt;</code>\n\n"
+                "👉 ឬគ្រាន់តែ Paste កូដ Token (ផ្តើមដោយ EAAB...) ចូលឆាតនេះផ្ទាល់តែម្តង!",
+                reply_markup={
+                    "inline_keyboard": [
+                        [{"text": "🔑 របៀបយក Page Token (10 វិនាទី)", "callback_data": "help_token_guide"}],
+                        [{"text": "🔗 បើក Graph API Explorer", "url": "https://developers.facebook.com/tools/explorer/"}]
+                    ]
+                }
+            )
             return
-        token = parts[1]
-        self.send_message(chat_id, "⏳ <b>កំពុងផ្ទៀងផ្ទាត់ Access Token...</b>")
+        token = parts[1].strip()
+        self.send_message(chat_id, "⏳ <b>កំពុងផ្ទៀងផ្ទាត់ Access Token ជាមួយ Meta Graph API...</b>")
         res = self.auth_gateway.connect_with_token(chat_id, token)
-        self.send_message(chat_id, res["message"])
+        if res.get("success"):
+            kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "📄 មើល Pages របស់បង (/fb_pages)", "callback_data": "cmd_fb_pages"},
+                        {"text": "🔍 Scan Posts", "callback_data": "cmd_scan"}
+                    ]
+                ]
+            }
+            self.send_message(chat_id, res["message"], reply_markup=kb)
+        else:
+            kb = {
+                "inline_keyboard": [
+                    [{"text": "🔑 របៀបយក Page Token (10 វិនាទី)", "callback_data": "help_token_guide"}],
+                    [{"text": "🔗 បើក Graph API Explorer", "url": "https://developers.facebook.com/tools/explorer/"}]
+                ]
+            }
+            self.send_message(chat_id, res.get("message", "Token Error"), reply_markup=kb)
+
+    def handle_token_guide(self, chat_id: str):
+        """Displays step-by-step guide on how to get Page Access Token in 10s."""
+        msg = (
+            "🔑 <b>របៀបយក PAGE ACCESS TOKEN ក្នុងរយៈពេល ១០ វិនាទី (ងាយស្រួលបំផុត):</b>\n"
+            "────────────────────────────\n"
+            "1️⃣ <b>បើក Browser:</b> ចូលទៅកាន់ <a href=\"https://developers.facebook.com/tools/explorer/\">Graph API Explorer</a> (Facebook Account របស់បង)\n"
+            "2️⃣ <b>ជ្រើសរើស Page:</b> នៅត្រង់ប្រអប់ <b>\"User or Page\"</b> (ខាងស្តាំដៃ) -> សូមចុចរើសយក <b>Page របស់បង</b> (កុំរើស User Token)\n"
+            "3️⃣ <b>Copy Token:</b> ចុច Copy លើប្រអប់ <b>Access Token</b> (កូដវែងផ្តើមដោយ <code>EAAB...</code>)\n"
+            "4️⃣ <b>ផ្ញើមកកាន់ Bot:</b> គ្រាន់តែ Paste កូដនោះផ្ញើចូល Bot នេះផ្ទាល់ <code>/token &lt;Token&gt;</code> (ឬ Paste កូដចូលឆាតនេះភ្លាមៗ)\n"
+            "────────────────────────────\n"
+            "⚡ <i>ប្រព័ន្ធនឹងស្គាល់ Page របស់បងភ្លាមៗ ១០០% ដោយមិនបាច់បង្កើត Meta App ID ស្មុគស្មាញឡើយ!</i>"
+        )
+        kb = {
+            "inline_keyboard": [
+                [{"text": "🔗 បើក Graph API Explorer លើ Browser", "url": "https://developers.facebook.com/tools/explorer/"}],
+                [{"text": "❓ ហេតុអ្វីត្រូវប្រើ Page Token?", "callback_data": "help_why_token"}],
+                [{"text": "⬅️ ត្រឡប់ទៅ Menu", "callback_data": "cmd_help"}]
+            ]
+        }
+        self.send_message(chat_id, msg, reply_markup=kb)
+
+    def handle_why_token(self, chat_id: str):
+        """Explains why Meta requires App ID or Page Access Token."""
+        msg = (
+            "💡 <b>ហេតុអ្វីប្រព័ន្ធមិនអាច Login ស្វ័យប្រវត្តដោយគ្មាន API / Meta App ID?</b>\n"
+            "────────────────────────────\n"
+            "🛡️ <b>១. គោលការណ៍សុវត្ថិភាព Meta & Browser (Same-Origin Sandboxing):</b>\n"
+            "Facebook មិនអនុញ្ញាតឱ្យគេហទំព័រ ឬ Server ខាងក្រៅ លួចអាន Cookie ឬ Account ដែលកំពុង Login ក្នុង Browser របស់អ្នកប្រើប្រាស់ឡើយ ដើម្បីការពារការលួចគណនី (Anti-Hacking & Anti-Session Hijacking)។\n\n"
+            "🔑 <b>២. Meta OAuth តម្រូវឱ្យមាន Meta App ID:</b>\n"
+            "ប៊ូតុង \"1-Click Facebook Login\" ជាផ្លូវការ តម្រូវឱ្យ Server មាន Meta App ID ចុះឈ្មោះជាមួយ Meta Developers ជាមុនសិន ទើប Meta បើកផ្ទាំង OAuth ឱ្យចូលបាន។\n\n"
+            "⚡ <b>៣. ដំណោះស្រាយងាយស្រួលបំផុត (Page Access Token):</b>\n"
+            "ដោយសារមិនចង់ឱ្យបងពិបាកបង្កើត App ID លើ Meta Developers យើងបានបង្កើតជម្រើស <b>Page Access Token</b> តាម Graph API Explorer។ បងគ្រាន់តែ Copy យក Token មក Paste នោះ Bot នឹងភ្ជាប់ជាមួយ Page របស់បងភ្លាមៗ ១០០%!\n"
+            "────────────────────────────\n"
+            "👉 គ្រាន់តែចុចប៊ូតុងខាងក្រោមដើម្បីយក Token ក្នុងរយៈពេល ១០ វិនាទី!"
+        )
+        kb = {
+            "inline_keyboard": [
+                [{"text": "🔑 របៀបយក Page Token (10 វិនាទី)", "callback_data": "help_token_guide"}],
+                [{"text": "⬅️ ត្រឡប់ទៅ Menu", "callback_data": "cmd_help"}]
+            ]
+        }
+        self.send_message(chat_id, msg, reply_markup=kb)
 
     def handle_fb_cookie(self, chat_id: str, text: str):
         """Processes /fb_cookie <cookie_string> command."""
@@ -998,7 +1166,22 @@ class BMTelegramBot:
     def handle_train_page(self, chat_id: str, page_id: Optional[str] = None):
         """Executes Stage 1 Deep Training on Page's own DNA and products."""
         client, active_rec = self.auth_gateway.get_user_page_client(chat_id)
-        target_page_id = page_id or (active_rec.page_id if active_rec else client.page_id)
+        if not active_rec or not active_rec.page_id or client.is_mock:
+            self.send_message(
+                chat_id,
+                "⚠️ <b>លោកអ្នកមិនទាន់បានភ្ជាប់ Facebook Page នៅឡើយទេ!</b>\n\n"
+                "មុខងារ <b>Brand DNA Deep Training</b> តម្រូវឱ្យមាន Facebook Page ពិតប្រាកដដើម្បីសិក្សាពីអត្តសញ្ញាណ និងផលិតផលរបស់ Page លោកអ្នក។\n\n"
+                "👉 សូមភ្ជាប់ Page របស់លោកអ្នកជាមុនសិនតាមរយៈបញ្ជា <code>/token &lt;Token&gt;</code>!",
+                reply_markup={
+                    "inline_keyboard": [
+                        [{"text": "🔑 របៀបយក Page Token (10 វិនាទី)", "callback_data": "help_token_guide"}],
+                        [{"text": "🔗 ភ្ជាប់តាម Web Dashboard", "url": self._get_effective_web_url() + "/fb_login_redirect"}]
+                    ]
+                }
+            )
+            return
+
+        target_page_id = page_id or active_rec.page_id
         self.send_message(chat_id, f"⏳ <b>AI កំពុងសិក្សាស៊ីជម្រៅពី Brand DNA, ផលិតផល & អតិថិជនគោលដៅលើ Page <code>{target_page_id}</code>...</b>")
         dna = self.page_publisher.train_page_brand_dna(client, chat_id)
 
@@ -1032,8 +1215,23 @@ class BMTelegramBot:
     def handle_publish_now(self, chat_id: str, page_id: Optional[str] = None):
         """Immediately executes 5-Stage Publishing Workflow and posts 3-5 4K photos to Page."""
         client, active_rec = self.auth_gateway.get_user_page_client(chat_id)
-        target_page_id = page_id or (active_rec.page_id if active_rec else client.page_id)
-        p_name = active_rec.page_name if active_rec else target_page_id
+        if not active_rec or not active_rec.page_id or client.is_mock:
+            self.send_message(
+                chat_id,
+                "⚠️ <b>លោកអ្នកមិនទាន់បានភ្ជាប់ Facebook Page នៅឡើយទេ!</b>\n\n"
+                "មុខងារ <b>4K Multi-Photo Publisher</b> អាចដំណើរការបាន លុះត្រាតែលោកអ្នកភ្ជាប់ Facebook Page ផ្ទាល់ខ្លួនជាមុនសិន។ ប្រព័ន្ធមិនបង្ហោះមាតិកាក្លែងក្លាយឡើយ។\n\n"
+                "👉 សូមភ្ជាប់ Page របស់លោកអ្នកជាមុនសិនតាមរយៈបញ្ជា <code>/token &lt;Token&gt;</code>!",
+                reply_markup={
+                    "inline_keyboard": [
+                        [{"text": "🔑 របៀបយក Page Token (10 វិនាទី)", "callback_data": "help_token_guide"}],
+                        [{"text": "🔗 ភ្ជាប់តាម Web Dashboard", "url": self._get_effective_web_url() + "/fb_login_redirect"}]
+                    ]
+                }
+            )
+            return
+
+        target_page_id = page_id or active_rec.page_id
+        p_name = active_rec.page_name
 
         self.send_message(
             chat_id,
@@ -1055,11 +1253,10 @@ class BMTelegramBot:
         )
 
         if res.get("success"):
-            kb = {
-                "inline_keyboard": [
-                    [{"text": "🔗 បើកមើល Post លើ Facebook ផ្ទាល់", "url": res["post_url"] if not client.is_mock else "https://facebook.com"}]
-                ]
-            }
+            buttons = []
+            if res.get("post_url") and not client.is_mock:
+                buttons.append([{"text": "🔗 បើកមើល Post លើ Facebook ផ្ទាល់", "url": res["post_url"]}])
+            kb = {"inline_keyboard": buttons} if buttons else None
             self.send_message(chat_id, res["summary_khmer"], reply_markup=kb)
         else:
             self.send_message(chat_id, f"❌ <b>បរាជ័យក្នុងការ Post៖</b> {res.get('error') or res.get('reason')}")
@@ -1067,8 +1264,18 @@ class BMTelegramBot:
     def handle_auto_publish(self, chat_id: str, text: str):
         """Toggles scheduled 4K multi-photo auto-publishing for active page."""
         client, active_rec = self.auth_gateway.get_user_page_client(chat_id)
-        if not active_rec:
-            self.send_message(chat_id, "⚠️ សូមជ្រើសរើស Page សកម្មជាមុនសិនតាម /fb_pages ឬ /fb_select")
+        if not active_rec or not active_rec.page_id or client.is_mock:
+            self.send_message(
+                chat_id,
+                "⚠️ <b>លោកអ្នកមិនទាន់បានភ្ជាប់ Facebook Page នៅឡើយទេ!</b>\n\n"
+                "សូមភ្ជាប់ Facebook Page ជាមុនសិនតាមរយៈ <code>/token &lt;Token&gt;</code> ដើម្បីកំណត់កាលវិភាគ Auto-Publish!",
+                reply_markup={
+                    "inline_keyboard": [
+                        [{"text": "🔑 របៀបយក Page Token (10 វិនាទី)", "callback_data": "help_token_guide"}],
+                        [{"text": "🔗 ភ្ជាប់តាម Web Dashboard", "url": self._get_effective_web_url() + "/fb_login_redirect"}]
+                    ]
+                }
+            )
             return
 
         parts = text.split()
@@ -1559,8 +1766,10 @@ class BMTelegramBot:
                         elif text.startswith("/fb_select"):
                             p_id = text.replace("/fb_select", "", 1).strip()
                             self.handle_fb_select_page(chat_id, p_id)
-                        elif text.startswith("/fb_token"):
+                        elif text.startswith("/fb_token") or text.startswith("/token"):
                             self.handle_fb_token(chat_id, text)
+                        elif text.startswith("EAA") and len(text) > 30 and not text.startswith("/"):
+                            self.handle_fb_token(chat_id, f"/token {text}")
                         elif text.startswith("/fb_cookie"):
                             self.handle_fb_cookie(chat_id, text)
                         elif text in ("/fb_logout", "/logout"):
@@ -1656,8 +1865,10 @@ class BMTelegramBot:
                 elif cmd.startswith("/fb_select"):
                     p_id = cmd.replace("/fb_select", "", 1).strip()
                     self.handle_fb_select_page("terminal_user", p_id)
-                elif cmd.startswith("/fb_token"):
+                elif cmd.startswith("/fb_token") or cmd.startswith("/token"):
                     self.handle_fb_token("terminal_user", cmd)
+                elif cmd.startswith("EAA") and len(cmd) > 30 and not cmd.startswith("/"):
+                    self.handle_fb_token("terminal_user", f"/token {cmd}")
                 elif cmd.startswith("/fb_cookie"):
                     self.handle_fb_cookie("terminal_user", cmd)
                 elif cmd in ("/fb_logout", "/logout"):
