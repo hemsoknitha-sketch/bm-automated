@@ -48,6 +48,7 @@ CFA Flash Feed/
 models/*.safetensors
 
 # Testing & Coverage
+push_to_github.py
 .pytest_cache/
 .coverage
 htmlcov/
