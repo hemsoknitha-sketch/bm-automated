@@ -39,6 +39,7 @@ from auto_comment_responder import AutoCommentResponder
 from fb_multi_tenant_manager import MultiTenantManager, ManagedPageRecord
 from fb_auth_gateway import FBAuthGateway
 from fb_offline_boost_engine import FBOfflineBoostEngine, OfflineBoostPackage
+from fb_page_autonomous_publisher import PageAutonomousPublisherEngine
 
 logger = logging.getLogger("BM_AUTOMATED.TelegramBot")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -91,6 +92,9 @@ class BMTelegramBot:
         # AI Offline Boost & Viral Creator Master Engine
         self.offline_boost_engine = FBOfflineBoostEngine()
         self._last_offline_packages: Dict[str, OfflineBoostPackage] = {}
+
+        # Autonomous 4K Brand Trainer & Publisher Engine
+        self.page_publisher = PageAutonomousPublisherEngine.get_instance()
 
     @property
     def is_configured(self) -> bool:
@@ -479,6 +483,28 @@ class BMTelegramBot:
                 new_val = not target_p.is_active_chat
                 self.multi_tenant.update_page_settings(chat_id, p_id, is_active_chat=new_val)
                 self.handle_fb_settings(chat_id, p_id)
+        elif data.startswith("toggle_autopub_"):
+            p_id = data.replace("toggle_autopub_", "")
+            pages = self.multi_tenant.get_user_pages(chat_id)
+            target_p = next((p for p in pages if p.page_id == p_id), None)
+            if target_p:
+                new_val = not target_p.is_auto_publisher_active
+                self.multi_tenant.update_page_auto_publisher_settings(chat_id, p_id, is_active=new_val)
+                self.handle_fb_settings(chat_id, p_id)
+        elif data.startswith("toggle_interval_"):
+            p_id = data.replace("toggle_interval_", "")
+            pages = self.multi_tenant.get_user_pages(chat_id)
+            target_p = next((p for p in pages if p.page_id == p_id), None)
+            if target_p:
+                new_interval = 1 if target_p.publish_interval_hours == 2 else 2
+                self.multi_tenant.update_page_auto_publisher_settings(chat_id, p_id, interval_hours=new_interval)
+                self.handle_fb_settings(chat_id, p_id)
+        elif data.startswith("train_dna_"):
+            p_id = data.replace("train_dna_", "")
+            self.handle_train_page(chat_id, p_id)
+        elif data.startswith("pubnow_"):
+            p_id = data.replace("pubnow_", "")
+            self.handle_publish_now(chat_id, p_id)
         elif data.startswith("boost_"):
             post_id = data.replace("boost_", "")
             self.handle_boost_command(chat_id, [post_id])
@@ -806,6 +832,7 @@ class BMTelegramBot:
 
         boost_txt = "🟢 ON (សកម្ម)" if target.is_active_boost else "🔴 OFF (បិទ)"
         chat_txt = "🟢 ON (សកម្ម)" if target.is_active_chat else "🔴 OFF (បិទ)"
+        pub_txt = f"🟢 ON ({target.publish_interval_hours}h / {target.auto_post_photo_count} photos)" if target.is_auto_publisher_active else "🔴 OFF (បិទ)"
 
         msg = (
             f"⚙️ <b>ការកំណត់សម្រាប់ PAGE:</b> <b>{target.page_name}</b>\n"
@@ -813,17 +840,26 @@ class BMTelegramBot:
             f"• <b>Page ID:</b> <code>{target.page_id}</code>\n"
             f"• <b>Autonomous Boost:</b> {boost_txt}\n"
             f"• <b>AI Messenger Chat Closer:</b> {chat_txt}\n"
+            f"• <b>4K Scheduled Publisher:</b> {pub_txt}\n"
             f"• <b>Daily Budget Limit:</b> <b>${target.daily_budget_usd:.2f}/day</b>\n"
             f"• <b>Min ROAS Hurdle:</b> <code>{target.min_roas_hurdle}X</code>\n"
             "────────────────────────────\n"
-            "💡 ចុចប៊ូតុងខាងក្រោមដើម្បី បើក/បិទ មុខងារ៖"
+            "💡 ចុចប៊ូតុងខាងក្រោមដើម្បី បើក/បិទ និងបញ្ជាមុខងារស្វ័យប្រវត្តិ៖"
         )
 
         keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": f"🚀 Toggle Boost ({'បិទ' if target.is_active_boost else 'បើក'})", "callback_data": f"toggle_boost_{page_id}"},
-                    {"text": f"💬 Toggle Chat ({'បិទ' if target.is_active_chat else 'បើក'})", "callback_data": f"toggle_chat_{page_id}"}
+                    {"text": f"🚀 Boost ({'បិទ' if target.is_active_boost else 'បើក'})", "callback_data": f"toggle_boost_{page_id}"},
+                    {"text": f"💬 Chat ({'បិទ' if target.is_active_chat else 'បើក'})", "callback_data": f"toggle_chat_{page_id}"}
+                ],
+                [
+                    {"text": f"🎨 4K Pub ({'បិទ' if target.is_auto_publisher_active else 'បើក'})", "callback_data": f"toggle_autopub_{page_id}"},
+                    {"text": f"⏱️ ពេល: {target.publish_interval_hours}h ({'ដូរទៅ 1h' if target.publish_interval_hours==2 else 'ដូរទៅ 2h'})", "callback_data": f"toggle_interval_{page_id}"}
+                ],
+                [
+                    {"text": "🧠 Train Brand DNA", "callback_data": f"train_dna_{page_id}"},
+                    {"text": "⚡ Publish 4K Now", "callback_data": f"pubnow_{page_id}"}
                 ],
                 [
                     {"text": "⬅️ ត្រឡប់ទៅកាន់បញ្ជី Pages", "callback_data": "cmd_fb_pages"}
@@ -861,6 +897,155 @@ class BMTelegramBot:
         """Processes /fb_logout command."""
         self.multi_tenant.delete_user(chat_id)
         self.send_message(chat_id, "🚪 <b>បាន Logout និងលុប Token ទាំងអស់ចេញពីប្រព័ន្ធដោយសុវត្ថិភាព!</b>")
+
+    # =========================================================================
+    # PAGE'S ITSELF TRAINING & AUTONOMOUS 4K PUBLISHER HANDLERS
+    # =========================================================================
+
+    def handle_train_page(self, chat_id: str, page_id: Optional[str] = None):
+        """Executes Stage 1 Deep Training on Page's own DNA and products."""
+        client, active_rec = self.auth_gateway.get_user_page_client(chat_id)
+        target_page_id = page_id or (active_rec.page_id if active_rec else client.page_id)
+        self.send_message(chat_id, f"⏳ <b>AI កំពុងសិក្សាស៊ីជម្រៅពី Brand DNA, ផលិតផល & អតិថិជនគោលដៅលើ Page <code>{target_page_id}</code>...</b>")
+        dna = self.page_publisher.train_page_brand_dna(client, chat_id)
+
+        products_list = "\n".join([f"  • {p}" for p in dna.extracted_products[:4]])
+        keywords_list = ", ".join(dna.top_keywords[:6])
+
+        card = (
+            f"🧠 <b>PAGE'S ITSELF BRAND DNA TRAINING COMPLETED!</b>\n"
+            f"────────────────────────────\n"
+            f"• <b>ឈ្មោះម៉ាក/Brand:</b> <b>{dna.brand_name}</b>\n"
+            f"• <b>ប្រភេទអាជីវកម្ម:</b> <code>{dna.category}</code>\n"
+            f"• <b>Hotlines ផ្លូវការ:</b> <code>{dna.hotlines}</code>\n"
+            f"• <b>ទីតាំង/Address:</b> {dna.address}\n"
+            f"• <b>ផែនទី/Map:</b> <a href=\"{dna.map_url}\">Google Maps Link</a>\n"
+            f"• <b>Tone of Voice:</b> <i>{dna.tone_of_voice}</i>\n"
+            f"• <b>ពាក្យគន្លឹះចម្បង:</b> <code>{keywords_list}</code>\n"
+            f"• <b>ផលិតផល/សេវាកម្មដែលបានរៀនសូត្រ:</b>\n{products_list}\n"
+            f"────────────────────────────\n"
+            f"💡 <i>ប្រព័ន្ធបានរៀនច្បាស់លាស់ពីអត្តសញ្ញាណ Page នេះរួចរាល់! រួចរាល់សម្រាប់ការបង្កើត 4K Multi-Photo Posts តាមកាលវិភាគ!</i>"
+        )
+        kb = {
+            "inline_keyboard": [
+                [
+                    {"text": "🚀 បង្កើត & Publish 4K Now", "callback_data": f"pubnow_{target_page_id}"},
+                    {"text": "⚙️ កំណត់កាលវិភាគ", "callback_data": f"setpage_{target_page_id}"}
+                ]
+            ]
+        }
+        self.send_message(chat_id, card, reply_markup=kb)
+
+    def handle_publish_now(self, chat_id: str, page_id: Optional[str] = None):
+        """Immediately executes 5-Stage Publishing Workflow and posts 3-5 4K photos to Page."""
+        client, active_rec = self.auth_gateway.get_user_page_client(chat_id)
+        target_page_id = page_id or (active_rec.page_id if active_rec else client.page_id)
+        p_name = active_rec.page_name if active_rec else target_page_id
+
+        self.send_message(
+            chat_id,
+            f"⚡ <b>AI កំពុងរៀបចំ 4K Multi-Photo Campaign សម្រាប់ Page [{p_name}]...</b>\n"
+            f"<i>(ទាញយករូប Original 3-5 សន្លឹក -> រចនា 4K Frame -> សរសេរ Selling Caption -> ផុសទៅ Page)</i>"
+        )
+
+        pages = self.multi_tenant.get_user_pages(chat_id)
+        cur_p = next((p for p in pages if p.page_id == target_page_id), None)
+        interval = cur_p.publish_interval_hours if cur_p else 2
+        photo_count = cur_p.auto_post_photo_count if cur_p else 4
+
+        res = self.page_publisher.execute_scheduled_publishing_cycle(
+            client=client,
+            telegram_id=chat_id,
+            interval_hours=interval,
+            photo_count=photo_count,
+            force_now=True
+        )
+
+        if res.get("success"):
+            kb = {
+                "inline_keyboard": [
+                    [{"text": "🔗 បើកមើល Post លើ Facebook ផ្ទាល់", "url": res["post_url"] if not client.is_mock else "https://facebook.com"}]
+                ]
+            }
+            self.send_message(chat_id, res["summary_khmer"], reply_markup=kb)
+        else:
+            self.send_message(chat_id, f"❌ <b>បរាជ័យក្នុងការ Post៖</b> {res.get('error') or res.get('reason')}")
+
+    def handle_auto_publish(self, chat_id: str, text: str):
+        """Toggles scheduled 4K multi-photo auto-publishing for active page."""
+        client, active_rec = self.auth_gateway.get_user_page_client(chat_id)
+        if not active_rec:
+            self.send_message(chat_id, "⚠️ សូមជ្រើសរើស Page សកម្មជាមុនសិនតាម /fb_pages ឬ /fb_select")
+            return
+
+        parts = text.split()
+        page_id = active_rec.page_id
+        is_active = True
+        interval = active_rec.publish_interval_hours or 2
+        photo_count = active_rec.auto_post_photo_count or 4
+
+        if len(parts) > 1:
+            cmd_arg = parts[1].lower()
+            if cmd_arg in ("off", "0", "pause", "stop"):
+                is_active = False
+            elif cmd_arg in ("on", "1", "start", "enable"):
+                is_active = True
+
+        if len(parts) > 2:
+            try:
+                interval = int(parts[2])
+                if interval < 1:
+                    interval = 1
+                elif interval > 24:
+                    interval = 24
+            except ValueError:
+                pass
+
+        if len(parts) > 3:
+            try:
+                photo_count = int(parts[3])
+                if photo_count < 3:
+                    photo_count = 3
+                elif photo_count > 5:
+                    photo_count = 5
+            except ValueError:
+                pass
+
+        self.multi_tenant.update_page_auto_publisher_settings(
+            telegram_id=chat_id,
+            page_id=page_id,
+            is_active=is_active,
+            interval_hours=interval,
+            photo_count=photo_count
+        )
+
+        status_icon = "🟢 <b>ACTIVE (បើកដំណើរការ)</b>" if is_active else "🔴 <b>PAUSED (បិទ)</b>"
+        card = (
+            f"⚙️ <b>AUTONOMOUS 4K PUBLISHER SETTINGS:</b>\n"
+            f"────────────────────────────\n"
+            f"• <b>Target Page:</b> <b>{active_rec.page_name}</b> (<code>{page_id}</code>)\n"
+            f"• <b>កាលវិភាគស្វ័យប្រវត្ត:</b> {status_icon}\n"
+            f"• <b>ចន្លោះពេល Post:</b> រៀងរាល់ <b>{interval} ម៉ោងម្តង</b>\n"
+            f"• <b>ចំនួនរូបភាពក្នុង Post:</b> <b>{photo_count} រូបភាព (4K Multi-Photo)</b>\n"
+            f"• <b>Circadian Protection:</b> 🛡️ មិនផុសនៅម៉ោងទាប 02:00 - 05:00 AM\n"
+            f"• <b>Deduplication Shield:</b> 🛡️ មិនជាន់គ្នាក្នុងរង្វង់ ៣០ ថ្ងៃ\n"
+            f"────────────────────────────\n"
+            f"💡 <i>ពេលបើកដំណើរការ ប្រព័ន្ធនឹងផុសរូបភាព 4K ចំនួន {photo_count} សន្លឹក "
+            f"ជាមួយ Caption លក់ប្រកបដោយវិជ្ជាជីវៈ និង Hotlines/Map រៀងរាល់ {interval} ម៉ោងម្តងដោយស្វ័យប្រវត្តិ!</i>"
+        )
+        kb = {
+            "inline_keyboard": [
+                [
+                    {"text": f"🚀 {'បិទ' if is_active else 'បើក'} Auto-Publish", "callback_data": f"toggle_autopub_{page_id}"},
+                    {"text": f"⏱️ ប្តូរពេល ({'1h' if interval==2 else '2h'})", "callback_data": f"toggle_interval_{page_id}"}
+                ],
+                [
+                    {"text": "🧠 Train Brand DNA", "callback_data": f"train_dna_{page_id}"},
+                    {"text": "⚡ Publish 4K Now", "callback_data": f"pubnow_{page_id}"}
+                ]
+            ]
+        }
+        self.send_message(chat_id, card, reply_markup=kb)
 
     def handle_help(self, chat_id: str):
         """Displays quick help and available bot commands."""
@@ -1087,6 +1272,9 @@ class BMTelegramBot:
 
         vip_commands = [
             {"command": "start", "description": "🚀 បើកផ្ទាំង Dashboard ចម្បង & Status"},
+            {"command": "auto_publish", "description": "⏱️ កាលវិភាគ 4K Multi-Photo Publisher (1h/2h)"},
+            {"command": "train_page", "description": "🧠 សិក្សា Brand DNA & ផលិតផល Page ផ្ទាល់ខ្លួន"},
+            {"command": "publish_now", "description": "🚀 បង្កើត & ផុស 4K Multi-Photo Campaign ភ្លាមៗ"},
             {"command": "offline_boost", "description": "⚡ បង្កើត 4K Viral Package ($0 Ad Spend)"},
             {"command": "viral_creator", "description": "🎨 Trend-Jacking + 4K Banner + Audio"},
             {"command": "fb_login", "description": "🔑 ភ្ជាប់ Facebook Account ដោយងាយស្រួល"},
@@ -1113,6 +1301,9 @@ class BMTelegramBot:
             {"command": "admin_sync", "description": "🔄 បង្ខំ Re-sync Pages ពី Facebook"},
             {"command": "admin_broadcast", "description": "📢 ផ្ញើសារប្រកាសទៅកាន់ Users ទាំងអស់"},
             {"command": "autopilot", "description": "🤖 បើក/បិទ Autonomous Engine ២៤/៧"},
+            {"command": "auto_publish", "description": "⏱️ កាលវិភាគ 4K Multi-Photo Publisher (1h/2h)"},
+            {"command": "train_page", "description": "🧠 សិក្សា Brand DNA & ផលិតផល Page ផ្ទាល់ខ្លួន"},
+            {"command": "publish_now", "description": "🚀 បង្កើត & ផុស 4K Multi-Photo Campaign ភ្លាមៗ"},
             {"command": "offline_boost", "description": "⚡ បង្កើត 4K Viral Package ($0 Ad Spend)"},
             {"command": "viral_creator", "description": "🎨 Trend-Jacking + 4K Banner + Audio"},
             {"command": "scan", "description": "🔍 ស្កេន Posts & បង្ហាញប៊ូតុង 1-Tap Boost"},
@@ -1242,6 +1433,12 @@ class BMTelegramBot:
                             self.handle_admin_sync(chat_id)
                         elif text.startswith("/admin_broadcast"):
                             self.handle_admin_broadcast(chat_id, text)
+                        elif text.startswith("/auto_publish") or text.startswith("/autopublish"):
+                            self.handle_auto_publish(chat_id, text)
+                        elif text in ("/train_page", "/train_dna"):
+                            self.handle_train_page(chat_id)
+                        elif text in ("/publish_now", "/test_publish", "/pubnow"):
+                            self.handle_publish_now(chat_id)
                         elif text.startswith("/fb_login"):
                             self.handle_fb_login(chat_id, text)
                         elif text.startswith("/fb_2fa"):
@@ -1331,6 +1528,12 @@ class BMTelegramBot:
                     self.handle_admin_sync("terminal_user")
                 elif cmd.startswith("/admin_broadcast"):
                     self.handle_admin_broadcast("terminal_user", cmd)
+                elif cmd.startswith("/auto_publish") or cmd.startswith("/autopublish"):
+                    self.handle_auto_publish("terminal_user", cmd)
+                elif cmd in ("/train_page", "/train_dna"):
+                    self.handle_train_page("terminal_user")
+                elif cmd in ("/publish_now", "/test_publish", "/pubnow"):
+                    self.handle_publish_now("terminal_user")
                 elif cmd.startswith("/fb_login"):
                     self.handle_fb_login("terminal_user", cmd)
                 elif cmd.startswith("/fb_2fa"):

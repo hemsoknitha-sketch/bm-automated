@@ -77,6 +77,47 @@ def run_scan_cycle(orchestrator: AutoBoostOrchestrator):
     print("=" * 80 + "\n")
 
 
+def check_autonomous_publishing():
+    """Checks and executes scheduled 4K multi-photo publishing for all enabled VIP pages."""
+    try:
+        from fb_page_autonomous_publisher import PageAutonomousPublisherEngine
+        from fb_multi_tenant_manager import MultiTenantManager
+        from bm_telegram_bot import BMTelegramBot
+        mt_mgr = MultiTenantManager.get_instance()
+        pub_engine = PageAutonomousPublisherEngine.get_instance()
+        active_auto_pages = mt_mgr.get_active_auto_publish_pages()
+        now_ts = time.time()
+        for p in active_auto_pages:
+            interval_sec = int(p.get("publish_interval_hours", 2)) * 3600
+            last_time = float(p.get("last_auto_post_time", 0))
+            if (now_ts - last_time) >= interval_sec:
+                p_id = p.get("page_id")
+                t_id = str(p.get("telegram_id"))
+                p_name = p.get("page_name", p_id)
+                logger.info(f"⏰ [DAEMON SCHEDULE] Time to publish for Page [{p_name}] ({p_id})!")
+                p_client = MetaGraphAPIClient(
+                    access_token=p.get("page_token") or config.meta.access_token,
+                    page_id=p_id,
+                    ad_account_id=config.meta.ad_account_id,
+                    api_version=config.meta.api_version,
+                    is_mock=config.meta.is_mock
+                )
+                res = pub_engine.execute_scheduled_publishing_cycle(
+                    client=p_client,
+                    telegram_id=t_id,
+                    interval_hours=int(p.get("publish_interval_hours", 2)),
+                    photo_count=int(p.get("auto_post_photo_count", 4)),
+                    force_now=False
+                )
+                if res.get("success"):
+                    logger.info(f"🎉 Successfully published scheduled campaign: {res.get('post_id')}")
+                    tbot = BMTelegramBot()
+                    if tbot.is_configured and t_id:
+                        tbot.send_message(t_id, res["summary_khmer"])
+    except Exception as e:
+        logger.error(f"Error in autonomous publishing daemon cycle: {e}")
+
+
 def run_daemon(orchestrator: AutoBoostOrchestrator, interval_seconds: int = 300):
     """Runs continuous background automation loop."""
     print("=" * 80)
@@ -87,6 +128,7 @@ def run_daemon(orchestrator: AutoBoostOrchestrator, interval_seconds: int = 300)
     try:
         while True:
             run_scan_cycle(orchestrator)
+            check_autonomous_publishing()
             print(f"⏳ Sleeping for {interval_seconds}s until next scan... (Press Ctrl+C to stop)")
             time.sleep(interval_seconds)
     except KeyboardInterrupt:

@@ -485,6 +485,148 @@ class MetaGraphAPIClient:
             logger.error(f"Failed to publish post: {e}")
             return {"error": str(e)}
 
+    def get_page_profile_details(self) -> Dict[str, Any]:
+        """Retrieves page profile, contact info, category, and location."""
+        if self.is_mock:
+            return {
+                "id": self.page_id or "page101",
+                "name": "Angkor Quant AI Store",
+                "category": "E-commerce & AI Technology",
+                "phone": "+855 85 927 1875",
+                "emails": ["contact@angkorquant.com"],
+                "website": "https://angkorquant.com",
+                "single_line_address": "Street 2004, Phnom Penh, Cambodia",
+                "location": {"city": "Phnom Penh", "country": "Cambodia", "latitude": 11.5564, "longitude": 104.9282},
+                "about": "ឈានមុខគេលើបច្ចេកវិទ្យា AI ទីផ្សារឌីជីថល ស្វ័យប្រវត្តិកម្ម និងផលិតផលគុណភាពខ្ពស់ស្តង់ដារអន្តរជាតិ។"
+            }
+
+        url = f"{self.GRAPH_URL}/{self.api_version}/{self.page_id}"
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+        params = {"fields": "id,name,about,description,category,phone,emails,website,single_line_address,location"}
+        try:
+            resp = requests.get(url, headers=headers, params=params, timeout=12)
+            if resp.status_code == 200:
+                return resp.json()
+        except Exception as e:
+            logger.error(f"Error fetching page profile details: {e}")
+        return {"id": self.page_id, "name": "Facebook Page"}
+
+    def get_page_uploaded_photos(self, limit: int = 30) -> List[Dict[str, Any]]:
+        """Retrieves high-resolution uploaded photos directly from the Page's albums."""
+        if self.is_mock:
+            return [
+                {
+                    "id": f"photo_{i}",
+                    "name": f"Product Item Angle {i}",
+                    "source": f"https://picsum.photos/seed/product_{i}/1200/1200",
+                    "width": 1200,
+                    "height": 1200,
+                    "created_time": time.strftime("%Y-%m-%dT%H:%M:%S+0000", time.gmtime(time.time() - i * 3600))
+                }
+                for i in range(1, 10)
+            ]
+
+        url = f"{self.GRAPH_URL}/{self.api_version}/{self.page_id}/photos"
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+        params = {"type": "uploaded", "fields": "id,images,name,created_time", "limit": limit}
+        try:
+            resp = requests.get(url, headers=headers, params=params, timeout=15)
+            if resp.status_code == 200:
+                data = resp.json().get("data", [])
+                results = []
+                for p in data:
+                    images = p.get("images", [])
+                    src = images[0].get("source") if images else ""
+                    w = images[0].get("width", 0) if images else 0
+                    h = images[0].get("height", 0) if images else 0
+                    results.append({
+                        "id": p.get("id"),
+                        "name": p.get("name", "Product Image"),
+                        "source": src,
+                        "width": w,
+                        "height": h,
+                        "created_time": p.get("created_time")
+                    })
+                return results
+        except Exception as e:
+            logger.error(f"Error fetching uploaded page photos: {e}")
+        return []
+
+    def publish_multi_photo_post(self, message: str, image_paths_or_urls: List[str]) -> Dict[str, Any]:
+        """
+        Publishes an institutional Multi-Photo post (3 to 5 images) directly to the Facebook Page feed.
+        Implements 2-phase atomic upload:
+        Phase 1: Upload each image as unpublished (published=false) to acquire photo IDs.
+        Phase 2: Attach all photo IDs to a single feed post with the master caption.
+        """
+        if self.is_mock:
+            mock_id = f"{self.page_id}_multiphoto_{int(time.time())}"
+            logger.info(f"[SIMULATION] Published Multi-Photo Post ({len(image_paths_or_urls)} photos) {mock_id}: {message[:50]}...")
+            return {
+                "id": mock_id,
+                "photo_count": len(image_paths_or_urls),
+                "status": "PUBLISHED_MULTI_PHOTO_SIMULATION",
+                "post_url": f"https://facebook.com/{mock_id}"
+            }
+
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+        photo_ids = []
+
+        # Phase 1: Upload unpublished photos
+        for item in image_paths_or_urls:
+            endpoint = f"{self.GRAPH_URL}/{self.api_version}/{self.page_id}/photos"
+            try:
+                if os.path.exists(item):
+                    with open(item, "rb") as f:
+                        resp = requests.post(
+                            endpoint,
+                            data={"published": "false"},
+                            files={"source": f},
+                            headers=headers,
+                            timeout=25
+                        )
+                else:
+                    resp = requests.post(
+                        endpoint,
+                        data={"url": item, "published": "false"},
+                        headers=headers,
+                        timeout=25
+                    )
+                if resp.status_code == 200:
+                    p_id = resp.json().get("id")
+                    if p_id:
+                        photo_ids.append(p_id)
+                else:
+                    logger.warning(f"Failed to upload photo item: {resp.text}")
+            except Exception as e:
+                logger.error(f"Error uploading photo item: {e}")
+
+        if not photo_ids:
+            return {"error": "Failed to upload any photos for multi-photo post."}
+
+        # Phase 2: Create feed post with attached_media
+        feed_endpoint = f"{self.GRAPH_URL}/{self.api_version}/{self.page_id}/feed"
+        attached_media = json.dumps([{"media_fbid": pid} for pid in photo_ids])
+        payload = {
+            "message": message,
+            "attached_media": attached_media
+        }
+
+        try:
+            resp = requests.post(feed_endpoint, data=payload, headers=headers, timeout=20)
+            resp.raise_for_status()
+            res_json = resp.json()
+            post_id = res_json.get("id", "new_post")
+            return {
+                "id": post_id,
+                "photo_count": len(photo_ids),
+                "photo_ids": photo_ids,
+                "post_url": f"https://facebook.com/{post_id}"
+            }
+        except Exception as e:
+            logger.error(f"Failed to publish multi-photo feed post: {e}")
+            return {"error": str(e)}
+
     def reply_to_comment(self, comment_id: str, message: str) -> bool:
         """Sends a public comment reply to a user's comment."""
         if self.is_mock:

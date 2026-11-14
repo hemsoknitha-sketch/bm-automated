@@ -41,6 +41,7 @@ fi
 $PYTHON_BIN test_bm_automated.py
 $PYTHON_BIN test_fb_multi_tenant.py
 $PYTHON_BIN test_fb_offline_boost.py
+$PYTHON_BIN test_fb_page_autonomous_publisher.py
 
 # 4. Restart services
 echo "🚀 Step 4: Restarting 24/7 services..."

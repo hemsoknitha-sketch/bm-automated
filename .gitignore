@@ -40,6 +40,7 @@ data/*.db-journal
 data/banner_*.jpg
 data/voice_*.mp3
 data/temp_*
+data/page_assets/
 
 # Embedded Sub-Repositories (Kept Independent)
 CFA Flash Feed/

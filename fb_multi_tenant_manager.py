@@ -44,6 +44,10 @@ class ManagedPageRecord:
     daily_budget_usd: float    # User-defined daily budget limit
     min_roas_hurdle: float     # Minimum ROAS hurdle
     last_synced: float
+    is_auto_publisher_active: bool = False
+    publish_interval_hours: int = 2
+    last_auto_post_time: float = 0.0
+    auto_post_photo_count: int = 4
 
 
 class TokenEncryptionVault:
@@ -147,9 +151,55 @@ class MultiTenantManager:
             )
             """)
 
+            # 4. Page Brand DNA Table (Page's Itself Learned Profile & Products)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS page_brand_dna (
+                page_id TEXT PRIMARY KEY,
+                telegram_id TEXT,
+                brand_name TEXT,
+                category TEXT,
+                hotlines TEXT,
+                address TEXT,
+                map_url TEXT,
+                messenger_url TEXT,
+                tone_of_voice TEXT,
+                extracted_products TEXT,
+                top_keywords TEXT,
+                last_trained REAL
+            )
+            """)
+
+            # 5. Page Auto Post Ledger (Idempotency & 30-Day Anti-Duplicate)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS page_auto_post_ledger (
+                post_id TEXT PRIMARY KEY,
+                page_id TEXT,
+                telegram_id TEXT,
+                headline TEXT,
+                headline_hash TEXT,
+                image_hashes TEXT,
+                photo_count INTEGER,
+                published_at REAL,
+                fb_post_url TEXT
+            )
+            """)
+
+            # Safe column migration for managed_pages
+            for col_def in [
+                ("is_auto_publisher_active", "INTEGER DEFAULT 0"),
+                ("publish_interval_hours", "INTEGER DEFAULT 2"),
+                ("last_auto_post_time", "REAL DEFAULT 0"),
+                ("auto_post_photo_count", "INTEGER DEFAULT 4")
+            ]:
+                try:
+                    cursor.execute(f"ALTER TABLE managed_pages ADD COLUMN {col_def[0]} {col_def[1]};")
+                except sqlite3.OperationalError:
+                    pass
+
             # Indices for sub-millisecond retrieval
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_pages_telegram ON managed_pages(telegram_id);")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_pages_active ON managed_pages(telegram_id, is_active);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_ledger_page ON page_auto_post_ledger(page_id, published_at);")
             conn.commit()
 
     # =========================================================================
@@ -299,6 +349,7 @@ class MultiTenantManager:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM managed_pages WHERE telegram_id = ? ORDER BY is_active DESC, page_name ASC", (t_id,))
             for row in cursor.fetchall():
+                keys = row.keys()
                 results.append(ManagedPageRecord(
                     page_id=row["page_id"],
                     telegram_id=row["telegram_id"],
@@ -310,7 +361,11 @@ class MultiTenantManager:
                     is_active_chat=bool(row["is_active_chat"]),
                     daily_budget_usd=float(row["daily_budget_usd"]),
                     min_roas_hurdle=float(row["min_roas_hurdle"]),
-                    last_synced=float(row["last_synced"])
+                    last_synced=float(row["last_synced"]),
+                    is_auto_publisher_active=bool(row["is_auto_publisher_active"]) if "is_auto_publisher_active" in keys else False,
+                    publish_interval_hours=int(row["publish_interval_hours"]) if "publish_interval_hours" in keys else 2,
+                    last_auto_post_time=float(row["last_auto_post_time"]) if "last_auto_post_time" in keys else 0.0,
+                    auto_post_photo_count=int(row["auto_post_photo_count"]) if "auto_post_photo_count" in keys else 4
                 ))
         return results
 
@@ -431,4 +486,175 @@ class MultiTenantManager:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM auth_sessions WHERE telegram_id = ?", (t_id,))
+            conn.commit()
+
+    # =========================================================================
+    # PAGE BRAND DNA & AUTONOMOUS 4K PUBLISHER LEDGER
+    # =========================================================================
+
+    def save_page_brand_dna(self, page_id: str, telegram_id: str, dna_data: Dict[str, Any]) -> bool:
+        """Saves or updates Page's Itself Learned DNA & Products in database."""
+        p_id = str(page_id).strip()
+        t_id = str(telegram_id).strip()
+        now = time.time()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT INTO page_brand_dna (
+                page_id, telegram_id, brand_name, category, hotlines, address, map_url,
+                messenger_url, tone_of_voice, extracted_products, top_keywords, last_trained
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(page_id) DO UPDATE SET
+                telegram_id = excluded.telegram_id,
+                brand_name = excluded.brand_name,
+                category = excluded.category,
+                hotlines = excluded.hotlines,
+                address = excluded.address,
+                map_url = excluded.map_url,
+                messenger_url = excluded.messenger_url,
+                tone_of_voice = excluded.tone_of_voice,
+                extracted_products = excluded.extracted_products,
+                top_keywords = excluded.top_keywords,
+                last_trained = excluded.last_trained
+            """, (
+                p_id, t_id,
+                dna_data.get("brand_name", ""),
+                dna_data.get("category", ""),
+                dna_data.get("hotlines", ""),
+                dna_data.get("address", ""),
+                dna_data.get("map_url", ""),
+                dna_data.get("messenger_url", f"https://m.me/{p_id}"),
+                dna_data.get("tone_of_voice", "Professional & Customer-Centric"),
+                json.dumps(dna_data.get("extracted_products", [])),
+                json.dumps(dna_data.get("top_keywords", [])),
+                now
+            ))
+            conn.commit()
+            return True
+
+    def get_page_brand_dna(self, page_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves learned Brand DNA for a specific page."""
+        p_id = str(page_id).strip()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM page_brand_dna WHERE page_id = ?", (p_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            data = dict(row)
+            try:
+                data["extracted_products"] = json.loads(data.get("extracted_products") or "[]")
+            except Exception:
+                data["extracted_products"] = []
+            try:
+                data["top_keywords"] = json.loads(data.get("top_keywords") or "[]")
+            except Exception:
+                data["top_keywords"] = []
+            return data
+
+    def record_auto_post(
+        self,
+        post_id: str,
+        page_id: str,
+        telegram_id: str,
+        headline: str,
+        image_hashes: List[str],
+        fb_post_url: str = ""
+    ) -> bool:
+        """Records published post into the ledger to enforce 30-day deduplication."""
+        h_hash = hashlib.sha256(headline.encode("utf-8")).hexdigest()
+        now = time.time()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT OR REPLACE INTO page_auto_post_ledger (
+                post_id, page_id, telegram_id, headline, headline_hash, image_hashes, photo_count, published_at, fb_post_url
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                post_id, page_id, telegram_id, headline, h_hash,
+                json.dumps(image_hashes), len(image_hashes), now, fb_post_url
+            ))
+            conn.commit()
+            return True
+
+    def is_duplicate_post(
+        self,
+        page_id: str,
+        headline: str,
+        image_hashes: List[str],
+        window_days: int = 30
+    ) -> bool:
+        """Checks if identical headline or identical image combination was published recently."""
+        h_hash = hashlib.sha256(headline.encode("utf-8")).hexdigest()
+        cutoff = time.time() - (window_days * 86400)
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT post_id, headline_hash, image_hashes FROM page_auto_post_ledger
+            WHERE page_id = ? AND published_at >= ?
+            """, (page_id, cutoff))
+            rows = cursor.fetchall()
+            for r in rows:
+                if r["headline_hash"] == h_hash:
+                    return True
+                try:
+                    past_hashes = json.loads(r["image_hashes"] or "[]")
+                    if image_hashes and set(image_hashes).issubset(set(past_hashes)):
+                        return True
+                except Exception:
+                    pass
+            return False
+
+    def get_active_auto_publish_pages(self) -> List[Dict[str, Any]]:
+        """Returns all pages configured for autonomous scheduled publishing."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT p.*, u.fb_name FROM managed_pages p
+            LEFT JOIN users u ON p.telegram_id = u.telegram_id
+            WHERE p.is_auto_publisher_active = 1
+            """)
+            results = []
+            for r in cursor.fetchall():
+                d = dict(r)
+                d["page_token"] = self.vault.decrypt(d.get("encrypted_page_token", ""))
+                results.append(d)
+            return results
+
+    def update_page_auto_publisher_settings(
+        self,
+        telegram_id: str,
+        page_id: str,
+        is_active: Optional[bool] = None,
+        interval_hours: Optional[int] = None,
+        photo_count: Optional[int] = None
+    ) -> bool:
+        """Updates autonomous publisher settings for a specific page."""
+        t_id = str(telegram_id).strip()
+        p_id = str(page_id).strip()
+        updates = []
+        params = []
+        if is_active is not None:
+            updates.append("is_auto_publisher_active = ?")
+            params.append(1 if is_active else 0)
+        if interval_hours is not None:
+            updates.append("publish_interval_hours = ?")
+            params.append(int(interval_hours))
+        if photo_count is not None:
+            updates.append("auto_post_photo_count = ?")
+            params.append(int(photo_count))
+        if not updates:
+            return True
+        params.extend([t_id, p_id])
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"UPDATE managed_pages SET {', '.join(updates)} WHERE telegram_id = ? AND page_id = ?", tuple(params))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def update_last_auto_post_time(self, page_id: str):
+        """Updates last_auto_post_time timestamp to now."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE managed_pages SET last_auto_post_time = ? WHERE page_id = ?", (time.time(), page_id))
             conn.commit()
