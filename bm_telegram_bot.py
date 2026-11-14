@@ -888,16 +888,35 @@ class BMTelegramBot:
     def run_polling(self):
         """Runs 24/7 long-polling event loop or interactive terminal."""
         if not self.is_configured:
-            print("=" * 80)
-            print("⚠️ [BM TELEGRAM BOT] No BM_TELEGRAM_BOT_TOKEN provided in .env!")
-            print("   Running in Local Mock Interactive Terminal Mode.")
-            print("   You can test any command directly here (e.g. /scan, /active, /generate Gold AI, or paste any caption)!")
-            print("   👉 To connect to live Telegram on your phone:")
-            print("      1. Open Telegram & search @BotFather to create a free bot")
-            print("      2. Put token in .env: BM_TELEGRAM_BOT_TOKEN='your_token'")
-            print("======================================================================")
-            self.run_interactive_terminal()
-            return
+            is_interactive = sys.stdin.isatty() if hasattr(sys.stdin, "isatty") else False
+            if is_interactive:
+                print("=" * 80)
+                print("⚠️ [BM TELEGRAM BOT] No BM_TELEGRAM_BOT_TOKEN provided in .env!")
+                print("   Running in Local Mock Interactive Terminal Mode.")
+                print("   You can test any command directly here (e.g. /scan, /active, /generate Gold AI, or paste any caption)!")
+                print("   👉 To connect to live Telegram on your phone:")
+                print("      1. Open Telegram & search @BotFather to create a free bot")
+                print("      2. Put token in .env: BM_TELEGRAM_BOT_TOKEN='your_token'")
+                print("======================================================================")
+                self.run_interactive_terminal()
+                return
+            else:
+                # Background / Daemon mode: wait gracefully for user to supply token in .env
+                logger.warning("⚠️ [BM TELEGRAM BOT] No BM_TELEGRAM_BOT_TOKEN or TELEGRAM_BOT_TOKEN found in .env!")
+                logger.info("   Daemon is running and waiting for token in .env... (checking every 10s)")
+                while not self.is_configured:
+                    time.sleep(10)
+                    try:
+                        from dotenv import load_dotenv
+                        load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env", override=True)
+                        t = os.getenv("BM_TELEGRAM_BOT_TOKEN", os.getenv("TELEGRAM_BOT_TOKEN", "")).strip()
+                        if t and len(t) > 15:
+                            self.token = t
+                            self.api_url = f"{self.TELEGRAM_API_URL}{self.token}"
+                            logger.info("🎉 [BM TELEGRAM BOT] Token loaded from .env! Activating live Telegram long polling...")
+                            break
+                    except Exception:
+                        pass
 
         print("=" * 80)
         print("🤖 [BM TELEGRAM BOT] STARTED 24/7 TELEGRAM LONG POLLING...")

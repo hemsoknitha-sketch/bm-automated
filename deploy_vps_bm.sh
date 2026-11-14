@@ -70,9 +70,13 @@ else
     PYTHON_BIN="$PYTHON_SYS"
 fi
 
-# 4. Create necessary subfolders
-echo "📁 Step 4: Preparing directories (logs, models, data, templates)..."
+# 4. Create necessary subfolders and ensure .env exists
+echo "📁 Step 4: Preparing directories and .env configuration..."
 mkdir -p logs models data templates
+if [ ! -f ".env" ]; then
+    echo "📝 Creating initial .env from .env.example..."
+    cp .env.example .env
+fi
 
 # 5. Train or verify models
 if [ ! -f "models/fb_roas_ensemble.pkl" ]; then
@@ -149,4 +153,13 @@ else
 fi
 echo "   • Web URL:      http://${PUBLIC_IP}:8088"
 echo "======================================================================"
+if grep -qE "BM_TELEGRAM_BOT_TOKEN=$|BM_TELEGRAM_BOT_TOKEN=\s*$" .env 2>/dev/null; then
+    echo "⚠️ [TELEGRAM ACTION REQUIRED]"
+    echo "   Your Telegram Bot Token is currently empty in .env!"
+    echo "   To connect your Bot so /start and commands work on your phone:"
+    echo "   👉 Run: nano .env"
+    echo "   👉 Set: BM_TELEGRAM_BOT_TOKEN=\"your_token_from_botfather\""
+    echo "   👉 Save: Ctrl+O, Enter, then Ctrl+X"
+    echo "======================================================================"
+fi
 

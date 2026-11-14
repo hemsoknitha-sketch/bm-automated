@@ -466,8 +466,12 @@ body {{
 
         if has_logo:
             try:
-                logo_img = Image.open(self.logo_path).convert("RGBA")
-                logo_img = logo_img.resize((logo_w, logo_w), Image.Resampling.LANCZOS)
+                if not hasattr(self, "_cached_logo") or self._cached_logo is None:
+                    raw_logo = Image.open(self.logo_path).convert("RGBA")
+                    if raw_logo.size[0] > 512 or raw_logo.size[1] > 512:
+                        raw_logo.thumbnail((512, 512), Image.Resampling.LANCZOS)
+                    self._cached_logo = raw_logo
+                logo_img = self._cached_logo.resize((logo_w, logo_w), Image.Resampling.LANCZOS)
                 img.paste(logo_img, (int(badge_start_x + badge_padding_x), int(badge_center_y - (logo_w / 2))), logo_img)
             except Exception as e:
                 logger.error(f"PIL logo paste failed: {e}")
