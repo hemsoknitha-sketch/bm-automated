@@ -697,55 +697,55 @@ class BMTelegramBot:
     # =========================================================================
 
     def handle_fb_login_guide(self, chat_id: str):
-        """Presents instructions for zero-setup Facebook login."""
+        """Presents instructions for connecting real Facebook Pages safely."""
         msg = (
-            "🔑 <b>ការភ្ជាប់ FACEBOOK ដោយងាយស្រួល (ZERO METADEV SETUP)</b>\n"
-            "<i>មិនបាច់មាន Meta App ID, Secret, ឬ Access Token ស្មុគស្មាញឡើយ!</i>\n"
+            "🔑 <b>ការភ្ជាប់ FACEBOOK PAGE ពិតប្រាកដ (REAL FACEBOOK PAGES)</b>\n"
+            "<i>(អនុវត្តតាមស្តង់ដារផ្លូវការរបស់ Meta Graph API ការពារគណនី ១០០%)</i>\n"
             "────────────────────────────\n"
-            "👉 <b>ជម្រើសទី ១ (លឿន & ងាយស្រួលបំផុត):</b>\n"
-            "វាយបញ្ជា៖ <code>/fb_login &lt;email&gt; &lt;password&gt;</code>\n"
-            "ឧទាហរណ៍៖ <code>/fb_login user@email.com MySecretPass123</code>\n"
-            "<i>(ប្រព័ន្ធលុប Password ចេញពី Memory ភ្លាមៗ និងប្រើកូដ 2FA /fb_2fa)</i>\n\n"
-            "👉 <b>ជម្រើសទី ២ (ភ្ជាប់តាម Browser Cookie c_user & xs):</b>\n"
+            "👉 <b>ជម្រើសទី ១ (ស្តង់ដារផ្លូវការ & ពេញនិយមបំផុត - Page Access Token):</b>\n"
+            "វាយបញ្ជា៖ <code>/fb_token &lt;Page_Access_Token&gt;</code>\n"
+            "ឧទាហរណ៍៖ <code>/fb_token EAAB12345...</code>\n"
+            "<i>(គ្រាន់តែ Copy យក Page Token ពី Meta Business Suite ឬ Graph API Explorer "
+            "ប្រព័ន្ធនឹងស្គាល់ Page ពិតប្រាកដរបស់បងភ្លាមៗ ១០០%!)</i>\n\n"
+            "👉 <b>ជម្រើសទី ២ (ភ្ជាប់តាម Browser Cookie Session):</b>\n"
             "វាយបញ្ជា៖ <code>/fb_cookie c_user=...; xs=...</code>\n"
-            "<i>(ជួយរំលង Checkpoint 100% ដោយមិនបាច់វាយលេខសម្ងាត់)</i>\n\n"
-            "👉 <b>ជម្រើសទី ៣ (បើមាន Access Token ឬ Page Token ស្រាប់):</b>\n"
-            "វាយបញ្ជា៖ <code>/fb_token EAA...</code>\n"
+            "<i>(បើក Facebook លើ Chrome/Edge -> F12 -> Application -> Cookies -> Copy c_user & xs "
+            "ដើម្បីរំលង Checkpoint ដោយមិនបាច់វាយលេខសម្ងាត់)</i>\n\n"
+            "👉 <b>ជម្រើសទី ៣ (កំណត់អចិន្ត្រៃយ៍ក្នុង VPS .env):</b>\n"
+            "បើក <code>nano ~/bm-automated/.env</code> រួចបំពេញ៖\n"
+            "• <code>META_ACCESS_TOKEN=\"EAAB...\"</code>\n"
+            "• <code>META_PAGE_ID=\"ID_Page_របស់បង\"</code>\n"
+            "• <code>META_IS_MOCK=false</code>\n"
             "────────────────────────────\n"
-            "💡 បន្ទាប់ពីភ្ជាប់ជោគជ័យ ប្រព័ន្ធនឹងទាញយក <b>Facebook Pages ទាំងអស់</b> ដែលបងគ្រប់គ្រង មកបង្ហាញជូនបងជ្រើសរើសភ្លាមៗ!"
+            "⚠️ <b>ចំណាំសំខាន់៖</b> Meta (Facebook) គ្មាន API អនុញ្ញាតឱ្យ App ក្រៅយក Email និង Password "
+            "ទៅ Login ដោយផ្ទាល់ឡើយ ដើម្បីការពារគណនីពីការត្រូវ Facebook Checkpoint/Lock! "
+            "សូមប្រើ <b>/fb_token</b> ឬ <b>/fb_cookie</b> ដើម្បីភ្ជាប់ Page ពិតប្រាកដដោយសុវត្ថិភាព!"
         )
         self.send_message(chat_id, msg)
 
     def handle_fb_login(self, chat_id: str, text: str):
-        """Processes /fb_login <email> <password> command."""
+        """Processes /fb_login command with Meta policy explanation and token guidance."""
         parts = text.split()
         if len(parts) < 3:
-            self.send_message(
-                chat_id,
-                "⚠️ <b>ទម្រង់ប្រើប្រាស់៖</b> <code>/fb_login &lt;email&gt; &lt;password&gt;</code>\n"
-                "ឧទាហរណ៍៖ <code>/fb_login user@email.com SecretPass123</code>"
-            )
+            self.handle_fb_login_guide(chat_id)
             return
 
         email = parts[1]
-        password = parts[2]
-        self.send_message(chat_id, "⏳ <b>កំពុងភ្ជាប់ទៅកាន់ Facebook និងទាញយក Pages របស់បង...</b>")
-
-        res = self.auth_gateway.execute_telegram_login(chat_id, email, password)
-        if res.get("status") == "AWAITING_2FA":
-            self.send_message(chat_id, res["message"])
-            return
-
-        if res.get("success"):
-            kb = {
-                "inline_keyboard": [
-                    [{"text": "📄 មើល និងជ្រើសរើស Pages របស់បង", "callback_data": "cmd_fb_pages"}],
-                    [{"text": "🔍 Scan Posts លើ Page ចម្បង", "callback_data": "cmd_scan"}]
-                ]
-            }
-            self.send_message(chat_id, res["message"], reply_markup=kb)
-        else:
-            self.send_message(chat_id, res["message"])
+        self.send_message(
+            chat_id,
+            "ℹ️ <b>សេចក្តីជូនដំណឹងអំពីសុវត្ថិភាព Facebook Login:</b>\n"
+            "────────────────────────────\n"
+            f"គណនី: <code>{email}</code>\n\n"
+            "Meta (Facebook) មិនអនុញ្ញាតឱ្យ Third-Party System បាញ់ Email/Password ចូលដោយផ្ទាល់ឡើយ "
+            "ពីព្រោះ Facebook នឹងចាត់ទុកជាការលួចចូលពីចម្ងាយ (Data Center IP) ហើយធ្វើការ Lock/Checkpoint គណនីរបស់បង!\n\n"
+            "👉 <b>ដើម្បីភ្ជាប់ Page ពិតប្រាកដរបស់បងដោយសុវត្ថិភាព សូមជ្រើសរើស៖</b>\n"
+            "1. <b>ប្រើ Page Access Token (ល្អបំផុត):</b>\n"
+            "   វាយ <code>/fb_token EAAB...</code>\n"
+            "2. <b>ប្រើ Cookie Session (រំលង Checkpoint):</b>\n"
+            "   វាយ <code>/fb_cookie c_user=...; xs=...</code>\n"
+            "────────────────────────────\n"
+            "💡 វាយ <b>/fb_connect</b> ដើម្បីមើលការណែនាំលម្អិត!"
+        )
 
     def handle_fb_2fa(self, chat_id: str, text: str):
         """Processes /fb_2fa <code> command."""
