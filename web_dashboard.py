@@ -342,17 +342,110 @@ def connect_multitenant_user():
 def fb_login_redirect():
     """
     Redirects user directly to Facebook App or Meta Web OAuth Dialog.
-    Allows 1-Click login without manual token copying.
+    If Meta App ID is not yet configured, displays an intuitive setup guide and direct token connector.
     """
     telegram_id = request.args.get("state", "web_vip_user").strip()
     host_url = request.host_url.rstrip("/")
     redirect_uri = f"{host_url}/fb_callback"
 
+    app_id = (config.meta.app_id or "").strip()
+    if not app_id or app_id == "108392189348912" or len(app_id) < 10:
+        return render_template_string("""
+        <!DOCTYPE html>
+        <html lang="km">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Meta App ID Required - Angkor Quant</title>
+          <style>
+            body { background: #0b0f19; color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+            .card { background: #131b2e; border: 1px solid #334155; border-radius: 16px; padding: 32px; max-width: 580px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.6); }
+            h2 { color: #f59e0b; font-size: 20px; margin-top: 0; display: flex; align-items: center; gap: 8px; }
+            .alert-box { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 12px 16px; margin: 16px 0; font-size: 13px; line-height: 1.5; color: #fcd34d; }
+            .step-box { background: #1e293b; border-radius: 10px; padding: 16px; margin-bottom: 16px; font-size: 13px; line-height: 1.6; }
+            .step-title { font-weight: 700; color: #38bdf8; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+            .btn { display: inline-block; background: #2563eb; color: #fff; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 13px; border: none; cursor: pointer; transition: 0.2s; }
+            .btn:hover { background: #1d4ed8; }
+            .btn-accent { background: #10b981; }
+            .btn-accent:hover { background: #059669; }
+            input[type="text"] { width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #334155; color: #fff; padding: 10px 14px; border-radius: 8px; margin: 8px 0; font-size: 13px; }
+            code { background: #0f172a; padding: 2px 6px; border-radius: 4px; color: #38bdf8; font-family: monospace; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h2>⚠️ ត្រូវការ Meta App ID សម្រាប់ Facebook 1-Click Login</h2>
+            <div class="alert-box">
+              ការចុចចូលតាម Facebook OAuth តម្រូវឱ្យមាន <b>Meta App ID</b> របស់បងដែលបានចុះឈ្មោះលើ <a href="https://developers.facebook.com" target="_blank" style="color: #60a5fa;">developers.facebook.com</a>។
+            </div>
+
+            <div class="step-box" style="border-left: 4px solid #10b981;">
+              <div class="step-title">🌟 ជម្រើសទី ១ (លឿន & ស្រួលបំផុត - មិនបាច់បង្កើត App ID ឡើយ!):</div>
+              <p style="margin: 6px 0 10px 0; color: #cbd5e1;">គ្រាន់តែ Copy យក <b>Page Access Token</b> ពី <a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color: #38bdf8;">Graph API Explorer</a> មក Paste នៅទីនេះ ប្រព័ន្ធនឹងស្គាល់ Page របស់បងភ្លាមៗ ១០០%!</p>
+              <form id="token-form" onsubmit="submitToken(event)">
+                <input type="text" id="direct-token" placeholder="Paste Page Access Token (EAAB...)" required>
+                <button type="submit" class="btn btn-accent" style="width: 100%; margin-top: 6px;">⚡ ភ្ជាប់ Page ភ្លាមៗ (Connect Now)</button>
+              </form>
+              <div id="token-status" style="margin-top: 8px; font-size: 12px; display: none;"></div>
+            </div>
+
+            <div class="step-box" style="border-left: 4px solid #38bdf8;">
+              <div class="step-title">⚙️ ជម្រើសទី ២ (បើចង់ឱ្យប៊ូតុង 1-Click Login ដំណើរការ):</div>
+              <p style="margin: 6px 0; color: #cbd5e1;">1. ចូលទៅ <a href="https://developers.facebook.com" target="_blank" style="color: #38bdf8;">developers.facebook.com</a> -> <b>Create App</b> (Business)</p>
+              <p style="margin: 6px 0; color: #cbd5e1;">2. Copy យក <b>App ID</b> & <b>App Secret</b> មកដាក់ក្នុង <code>~/bm-automated/.env</code> លើ VPS:</p>
+              <pre style="background: #0f172a; padding: 10px; border-radius: 6px; color: #38bdf8; font-size: 11px; overflow-x: auto;">META_APP_ID="លេខ_App_ID_របស់បង"
+META_APP_SECRET="លេខ_App_Secret_របស់បង"</pre>
+              <p style="margin: 6px 0; color: #cbd5e1;">3. Restart សេវាកម្ម នោះប៊ូតុង 1-Click Facebook Login នឹងដំណើរការ ១០០%!</p>
+            </div>
+
+            <div style="text-align: center; margin-top: 20px;">
+              <a href="/" class="btn" style="background: #334155;">⬅️ ត្រឡប់ទៅកាន់ Web Dashboard</a>
+            </div>
+          </div>
+
+          <script>
+            async function submitToken(e) {
+              e.preventDefault();
+              const status = document.getElementById('token-status');
+              const token = document.getElementById('direct-token').value.trim();
+              status.style.display = 'block';
+              status.style.color = '#94a3b8';
+              status.innerText = '⏳ កំពុងផ្ទៀងផ្ទាត់ Token ជាមួយ Meta Graph API...';
+
+              try {
+                const res = await fetch('/api/multitenant/connect', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    telegram_id: '{{ telegram_id }}',
+                    auth_type: 'TOKEN',
+                    token: token
+                  })
+                });
+                const data = await res.json();
+                if (data.success) {
+                  status.style.color = '#10b981';
+                  status.innerText = '✅ ភ្ជាប់ជោគជ័យ! កំពុងនាំលោកអ្នកទៅកាន់ Dashboard...';
+                  setTimeout(() => { window.location.href = '/'; }, 1500);
+                } else {
+                  status.style.color = '#ef4444';
+                  status.innerText = '❌ បរាជ័យ៖ ' + (data.message || 'Token មិនត្រឹមត្រូវ');
+                }
+              } catch (err) {
+                status.style.color = '#ef4444';
+                status.innerText = '❌ Error: ' + err.message;
+              }
+            }
+          </script>
+        </body>
+        </html>
+        """, telegram_id=telegram_id)
+
     auth_gw = FBAuthGateway()
     oauth_url = auth_gw.generate_oauth_url(
         telegram_id=telegram_id,
         redirect_uri=redirect_uri,
-        app_id=config.meta.app_id
+        app_id=app_id
     )
     return redirect(oauth_url)
 
@@ -373,7 +466,7 @@ def api_get_oauth_url():
     return jsonify({
         "oauth_url": oauth_url,
         "redirect_uri": redirect_uri,
-        "app_id": config.meta.app_id or auth_gw.DEFAULT_APP_ID
+        "app_id": config.meta.app_id or ""
     })
 
 

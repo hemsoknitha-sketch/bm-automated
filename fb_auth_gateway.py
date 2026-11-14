@@ -188,7 +188,7 @@ class FBAuthGateway:
     ) -> str:
         """Generates 1-Click Official Meta Login Webview URL."""
         t_id = str(telegram_id).strip()
-        actual_app_id = (app_id or os.getenv("META_APP_ID", "")).strip() or self.DEFAULT_APP_ID
+        actual_app_id = (app_id or os.getenv("META_APP_ID", "")).strip()
         scopes = "pages_show_list,pages_read_engagement,pages_manage_posts,pages_messaging,pages_read_user_content,ads_management,ads_read"
         return (
             f"https://www.facebook.com/{self.API_VERSION}/dialog/oauth"
@@ -211,7 +211,7 @@ class FBAuthGateway:
         Exchanges Meta OAuth authorization code for Long-Lived Token and extracts all Managed Pages.
         """
         t_id = str(telegram_id).strip() or "web_user"
-        actual_app_id = (app_id or os.getenv("META_APP_ID", "")).strip() or self.DEFAULT_APP_ID
+        actual_app_id = (app_id or os.getenv("META_APP_ID", "")).strip()
         actual_app_secret = (app_secret or os.getenv("META_APP_SECRET", "")).strip()
 
         # 1. Exchange code for short-lived user access token
