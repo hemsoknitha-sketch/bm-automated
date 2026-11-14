@@ -31,30 +31,20 @@ fi
 echo "======================================================================"
 
 # 0. Clean old caches & maximize available disk space
-echo "🧹 Step 0: Cleaning caches and maximizing free disk space..."
-rm -rf ~/.cache/pip ~/.cache/* /tmp/* /var/tmp/* 2>/dev/null || true
+echo "🧹 Step 0: Cleaning caches and checking disk space..."
+rm -rf ~/.cache/pip ~/.cache/* /tmp/pip-* /tmp/* 2>/dev/null || true
 if [ "$CAN_SUDO" -eq 1 ]; then
     sudo apt-get clean -y 2>/dev/null || true
-    sudo apt-get autoremove --purge -y 2>/dev/null || true
-    sudo journalctl --vacuum-size=20M 2>/dev/null || true
-    # Auto-expand partition if user enlarged disk in GCP Console
-    sudo growpart /dev/sda 1 2>/dev/null || sudo growpart /dev/nvme0n1 1 2>/dev/null || sudo growpart /dev/sdb 1 2>/dev/null || true
-    sudo resize2fs /dev/sda1 2>/dev/null || sudo resize2fs /dev/nvme0n1p1 2>/dev/null || sudo resize2fs /dev/sdb1 2>/dev/null || true
 fi
 
 FREE_MB=$(df -m "$DIR" | awk 'NR==2 {print $4}')
 echo "💾 Available Disk Space: ${FREE_MB} MB"
-if [ "$FREE_MB" -lt 1200 ]; then
-    echo "⚠️ [WARNING] Disk space is low (${FREE_MB} MB < 1200 MB)!"
-    echo "   Recommendation: Enlarge boot disk to 25GB or 30GB in Google Cloud Console:"
-    echo "   https://console.cloud.google.com/compute/disks?project=quant-gold-514007"
-fi
 
 # 1. System packages (if sudo is available)
 if [ "$CAN_SUDO" -eq 1 ]; then
     echo "📦 Step 1: Installing system packages via apt..."
     sudo apt-get update -y
-    sudo apt-get install -y python3-pip python3-venv python3-dev build-essential unzip curl cloud-guest-utils
+    sudo apt-get install -y python3-pip python3-venv python3-dev build-essential unzip curl
     sudo apt-get clean -y 2>/dev/null || true
 else
     echo "📦 Step 1: Skipping apt (User-space mode, using existing Python runtime)..."
@@ -69,11 +59,14 @@ if $PYTHON_SYS -m venv venv 2>/dev/null; then
     PYTHON_BIN="$DIR/venv/bin/python3"
     echo "✅ Created and activated isolated venv/"
     pip install --upgrade pip --no-cache-dir --quiet 2>/dev/null || true
-    echo "📦 Step 3: Installing dependencies in venv (zero-cache mode)..."
+    echo "📦 Step 3: Installing dependencies in venv (fast binary mode)..."
     pip install --no-cache-dir --prefer-binary -r requirements.txt
+    # Optional compiled ML packages (only if pre-built wheels exist for this python version)
+    pip install --no-cache-dir --only-binary=:all: lightgbm xgboost 2>/dev/null || true
 else
     echo "ℹ️ venv module not installed, installing dependencies in user space..."
     $PYTHON_SYS -m pip install --user --no-cache-dir --prefer-binary -r requirements.txt
+    $PYTHON_SYS -m pip install --user --no-cache-dir --only-binary=:all: lightgbm xgboost 2>/dev/null || true
     PYTHON_BIN="$PYTHON_SYS"
 fi
 
