@@ -22,11 +22,12 @@ git reset --hard origin/main
 
 # 2. Update dependencies if needed
 if [ -f "requirements.txt" ]; then
-    echo "📦 Step 2: Updating dependencies..."
+    echo "📦 Step 2: Updating dependencies (zero-cache mode)..."
+    rm -rf ~/.cache/pip /tmp/pip-* 2>/dev/null || true
     if [ -f "$DIR/venv/bin/pip" ]; then
-        "$DIR/venv/bin/pip" install -r requirements.txt --quiet
+        "$DIR/venv/bin/pip" install --no-cache-dir --prefer-binary -r requirements.txt
     else
-        python3 -m pip install -r requirements.txt --quiet || true
+        python3 -m pip install --no-cache-dir --prefer-binary -r requirements.txt || true
     fi
 fi
 
