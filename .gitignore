@@ -42,9 +42,6 @@ data/voice_*.mp3
 data/temp_*
 data/page_assets/
 
-# Embedded Sub-Repositories (Kept Independent)
-CFA Flash Feed/
-
 # Large Fine-Tuned Weights (>50MB, trained via Google Colab GPU)
 models/*.safetensors
 
