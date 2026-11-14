@@ -130,6 +130,37 @@ class BMTelegramBot:
         self._cached_public_ip = "127.0.0.1"
         return self._cached_public_ip
 
+    def _get_effective_web_url(self) -> str:
+        """
+        Determines the best publicly reachable URL for the Web GUI:
+        1. Explicit config.web_public_url (e.g. from .env)
+        2. Dynamic Cloudflare Tunnel URL from logs/cloudflare_tunnel.log
+        3. GCP VPS External IP (http://<IP>:8088)
+        4. Localhost fallback
+        """
+        # 1. Explicit configured URL
+        if config.web_public_url and len(config.web_public_url.strip()) > 7:
+            return config.web_public_url.strip().rstrip("/")
+
+        # 2. Cloudflare Tunnel Log Auto-Detection
+        tunnel_log = BASE_DIR / "logs" / "cloudflare_tunnel.log"
+        if tunnel_log.exists():
+            try:
+                import re
+                txt = tunnel_log.read_text(encoding="utf-8", errors="ignore")
+                matches = re.findall(r"https://[a-zA-Z0-9.-]*\.trycloudflare\.com", txt)
+                if matches:
+                    return matches[-1].rstrip("/")
+            except Exception:
+                pass
+
+        # 3. VPS Public IP
+        public_ip = self._get_cached_public_ip()
+        if public_ip and public_ip != "127.0.0.1":
+            return f"http://{public_ip}:{config.web_port}"
+
+        return f"http://localhost:{config.web_port}"
+
     @property
     def is_configured(self) -> bool:
         return bool(self.token and len(self.token) > 15)
@@ -254,11 +285,10 @@ class BMTelegramBot:
                 {"text": "📈 System Status", "callback_data": "cmd_status"}
             ])
 
-        public_ip = self._get_cached_public_ip()
-        port = config.web_port
+        web_url = self._get_effective_web_url()
         web_btn = (
-            {"text": "🌐 Web GUI Dashboard", "url": f"http://{public_ip}:{port}"}
-            if public_ip != "127.0.0.1"
+            {"text": "🌐 Web GUI Dashboard", "url": web_url}
+            if not web_url.startswith("http://localhost")
             else {"text": "🌐 Web GUI Dashboard", "callback_data": "cmd_web_dashboard"}
         )
 
@@ -740,9 +770,7 @@ class BMTelegramBot:
 
     def handle_fb_login_guide(self, chat_id: str):
         """Presents instructions for connecting real Facebook Pages safely."""
-        public_ip = self._get_cached_public_ip()
-        port = config.web_port
-        web_url = f"http://{public_ip}:{port}" if public_ip != "127.0.0.1" else f"http://localhost:{port}"
+        web_url = self._get_effective_web_url()
         oauth_url = f"{web_url}/fb_login_redirect?state={chat_id}"
 
         msg = (
@@ -771,9 +799,9 @@ class BMTelegramBot:
         )
 
         buttons = []
-        if public_ip != "127.0.0.1":
+        if not web_url.startswith("http://localhost"):
             buttons.append([
-                {"text": "🌐 បើក Web Login (Port 8088)", "url": web_url},
+                {"text": "🌐 បើក Web Login (SSL HTTPS)", "url": web_url},
                 {"text": "🚀 1-Click Facebook App Login", "url": oauth_url}
             ])
         else:
@@ -1146,30 +1174,29 @@ class BMTelegramBot:
         self.send_message(chat_id, help_text)
 
     def handle_web_dashboard_info(self, chat_id: str):
-        """Displays Web GUI access URL and instructions with live external IP."""
-        port = config.web_port
-        public_ip = self._get_cached_public_ip()
-        web_url = f"http://{public_ip}:{port}" if public_ip != "127.0.0.1" else f"http://localhost:{port}"
+        """Displays Web GUI access URL and instructions with live external IP or Cloudflare URL."""
+        web_url = self._get_effective_web_url()
         oauth_url = f"{web_url}/fb_login_redirect?state={chat_id}"
+        is_cf = "trycloudflare.com" in web_url or "https://" in web_url
 
         msg = (
             "🌐 <b>FB PAGE BM AUTOMATED - WEB GUI DASHBOARD</b>\n"
             "────────────────────────────\n"
             f"• <b>Web Dashboard URL:</b> <code>{web_url}</code>\n"
-            f"• <b>Web Port:</b> <code>{port}</code> (TCP)\n"
+            f"• <b>Security Protocol:</b> {'🛡️ <b>SSL HTTPS (Cloudflare Edge)</b>' if is_cf else '🔓 HTTP (Port 8088)'}\n"
             f"• <b>Meta API Status:</b> {'🛡️ Simulation' if self.api_client.is_mock else '🟢 Live Connected'}\n"
             "────────────────────────────\n"
             "💡 <b>របៀបចូលប្រើប្រាស់ Web Dashboard & Web Login៖</b>\n"
             f"👉 <b>ចុចបើកផ្ទាល់៖</b> <a href=\"{web_url}\">{web_url}</a>\n"
             "• អាចបើកបានទាំងលើ <b>Smartphone (Safari, Chrome)</b> ឬ <b>PC Browser</b>\n"
             "• ក្នុង Web Dashboard មានផ្ទាំង <b>➕ Connect Account</b> សម្រាប់ភ្ជាប់ Page ដោយផ្ទាល់ ឬចុច <b>1-Click Facebook App Login</b>!\n\n"
-            "<i>(ចំណាំ៖ ប្រសិនបើចុច Link ហើយមិនទាន់ដើរ សូមប្រាកដថា Google Cloud Firewall Rule បាន Allow Port 8088 លើ VPS)</i>"
+            "<i>(ចំណាំ៖ ប្រសិនបើប្រើ IP ផ្ទាល់ ហើយចុច Link មិនទាន់ដើរ សូមបើក Cloudflare Tunnel តាមរយៈ <code>bash setup_cloudflare_tunnel.sh</code> លើ VPS ដើម្បីទទួលបាន Link HTTPS ឥតគិតថ្លៃ និងលឿនបំផុត!)</i>"
         )
 
         buttons = []
-        if public_ip != "127.0.0.1":
+        if not web_url.startswith("http://localhost"):
             buttons.append([
-                {"text": "🌐 បើក Web Dashboard លើ VPS", "url": web_url},
+                {"text": "🌐 បើក Web Dashboard", "url": web_url},
                 {"text": "🚀 1-Click Facebook Login", "url": oauth_url}
             ])
         buttons.append([

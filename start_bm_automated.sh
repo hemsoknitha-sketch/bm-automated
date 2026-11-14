@@ -36,6 +36,21 @@ WEB_PID=$!
 echo "$WEB_PID" > /tmp/bm_web.pid
 echo "✅ [WEB GUI] Started on http://0.0.0.0:8088 with PID: $WEB_PID (Logging to logs/bm_web.log)"
 
+# Optional: Start Cloudflare Tunnel if installed (Free HTTPS & Zero-Firewall)
+CLOUDFLARED_CMD=""
+if command -v cloudflared &> /dev/null; then
+    CLOUDFLARED_CMD=$(which cloudflared)
+elif [ -f "$DIR/cloudflared" ]; then
+    CLOUDFLARED_CMD="$DIR/cloudflared"
+fi
+
+if [ -n "$CLOUDFLARED_CMD" ]; then
+    nohup $CLOUDFLARED_CMD tunnel --url http://localhost:8088 > logs/cloudflare_tunnel.log 2>&1 &
+    CF_PID=$!
+    echo "$CF_PID" > /tmp/bm_cloudflared.pid
+    echo "✅ [CLOUDFLARE TUNNEL] Started with PID: $CF_PID (Free HTTPS Active in logs/cloudflare_tunnel.log)"
+fi
+
 # Start Telegram Bot Controller in background
 nohup $PYTHON_BIN -u bm_telegram_bot.py >> logs/bm_bot.log 2>&1 &
 BOT_PID=$!

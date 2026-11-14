@@ -125,6 +125,7 @@ class SystemConfig:
     telegram: TelegramConfig = field(default_factory=TelegramConfig)
     web_port: int = int(os.getenv("BM_WEB_PORT", "8088"))
     web_host: str = os.getenv("BM_WEB_HOST", "0.0.0.0")
+    web_public_url: str = os.getenv("WEB_PUBLIC_URL", "")
 
 
 # Global singleton instance
