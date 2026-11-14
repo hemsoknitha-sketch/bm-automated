@@ -1,0 +1,58 @@
+{
+  "ad1": {
+    "adset_id": "adset1",
+    "last_spend": 3.5,
+    "last_roas": 1.1,
+    "last_clicks": 0,
+    "last_cpc": 0.0
+  },
+  "ad2": {
+    "adset_id": "adset2",
+    "last_spend": 12.0,
+    "last_roas": 3.8,
+    "last_clicks": 0,
+    "last_cpc": 0.0
+  },
+  "ad3": {
+    "adset_id": "adset3",
+    "last_spend": 10.0,
+    "last_roas": 0.85,
+    "last_clicks": 0,
+    "last_cpc": 0.0
+  },
+  "mock_ad_630131": {
+    "adset_id": "mock_adset_630131",
+    "last_spend": 12.5,
+    "last_roas": 3.42,
+    "last_clicks": 168,
+    "last_cpc": 0.074
+  },
+  "mock_ad_631192": {
+    "adset_id": "mock_adset_631192",
+    "last_spend": 12.5,
+    "last_roas": 3.42,
+    "last_clicks": 168,
+    "last_cpc": 0.074
+  },
+  "mock_ad_631691": {
+    "adset_id": "mock_adset_631691",
+    "last_spend": 12.5,
+    "last_roas": 3.42,
+    "last_clicks": 168,
+    "last_cpc": 0.074
+  },
+  "mock_ad_633761": {
+    "adset_id": "mock_adset_633761",
+    "last_spend": 12.5,
+    "last_roas": 3.42,
+    "last_clicks": 168,
+    "last_cpc": 0.074
+  },
+  "mock_ad_633843": {
+    "adset_id": "mock_adset_633843",
+    "last_spend": 12.5,
+    "last_roas": 3.42,
+    "last_clicks": 168,
+    "last_cpc": 0.074
+  }
+}

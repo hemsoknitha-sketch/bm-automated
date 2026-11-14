@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FB PAGE BM AUTOMATED - AI Business Manager & Page Boost Suite</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0a0d14;
+      --card-bg: #111726;
+      --card-border: #1e293b;
+      --primary: #1877f2;
+      --primary-hover: #166fe5;
+      --accent: #00f2fe;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: rgba(17, 23, 38, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .meta-logo {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #1877f2, #00f2fe);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 18px;
+      color: #fff;
+    }
+    .title-group h1 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .title-group p {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .header-badges {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .badge {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-live { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid var(--success); }
+    .badge-mock { background: rgba(245, 158, 11, 0.15); color: var(--warning); border: 1px solid var(--warning); }
+    .badge-port { background: #1e293b; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+
+    main {
+      flex: 1;
+      padding: 32px;
+      max-width: 1440px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    /* KPI Grid */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .kpi-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+      overflow: hidden;
+    }
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      opacity: 0.7;
+    }
+    .kpi-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+    .kpi-value {
+      font-size: 26px;
+      font-weight: 800;
+      color: #fff;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .kpi-sub {
+      font-size: 12px;
+      color: var(--success);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Main Sections */
+    .section-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .section-header h2 {
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn-secondary { background: #1e293b; color: var(--text-main); }
+    .btn-secondary:hover { background: #334155; }
+
+    /* Tables */
+    .table-container {
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+    th {
+      color: var(--text-muted);
+      font-weight: 600;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--card-border);
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+    }
+    td {
+      padding: 14px;
+      border-bottom: 1px solid rgba(30, 41, 59, 0.6);
+      vertical-align: middle;
+    }
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .post-text {
+      max-width: 320px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #cbd5e1;
+    }
+    .tag {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .tag-viral { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+    .tag-traction { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+    .tag-normal { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+    .tag-boosted { background: rgba(16, 185, 129, 0.2); color: #10b981; font-weight: 700; border: 1px solid #10b981; }
+
+    /* Simulator Form */
+    .sim-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 900px) {
+      .sim-grid { grid-template-columns: 1fr; }
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    textarea, select, input {
+      background: #0d121f;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      color: #fff;
+      padding: 10px 12px;
+      font-family: inherit;
+      font-size: 13px;
+    }
+    textarea:focus, select:focus, input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    .sim-result-card {
+      background: #0d121f;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .result-kpi-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .res-box {
+      background: #111726;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+      text-align: center;
+    }
+    .res-box .val {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .res-box .lbl {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    footer {
+      border-top: 1px solid var(--card-border);
+      padding: 18px 32px;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-container">
+      <div class="meta-logo">⚡</div>
+      <div class="title-group">
+        <h1>FB PAGE BM AUTOMATED</h1>
+        <p>Autonomous AI Meta Business Manager & Facebook Page Boost Engine</p>
+      </div>
+    </div>
+    <div class="header-badges">
+      <span id="badge-mode" class="badge badge-mock">Simulation Mode</span>
+      <span class="badge badge-port">Port: 8088</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- KPI Row -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <span class="kpi-label">Active Boosted Ads</span>
+        <span id="kpi-active-boosts" class="kpi-value">--</span>
+        <span class="kpi-sub">⚡ Real-time monitored</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Total Daily Budget</span>
+        <span id="kpi-daily-budget" class="kpi-value">$--</span>
+        <span class="kpi-sub">🛡️ Bandit auto-pacing</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Average Pred ROAS</span>
+        <span id="kpi-avg-roas" class="kpi-value">--X</span>
+        <span class="kpi-sub">📈 High-profit hurdle >= 2.2X</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Page Posts Monitored</span>
+        <span id="kpi-posts-count" class="kpi-value">--</span>
+        <span class="kpi-sub">🔍 Auto-scanned 24/7</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Meta Policy Shield</span>
+        <span class="kpi-value" style="color: var(--success); font-size: 20px;">100% ARMORED</span>
+        <span class="kpi-sub">🛡️ Zero Ban Protection</span>
+      </div>
+    </div>
+
+    <!-- Section: VIP Multi-Tenant Accounts & Managed Facebook Pages -->
+    <div class="section-card">
+      <div class="section-header">
+        <div>
+          <h2>🏢 VIP Accounts & Managed Facebook Pages (Zero Meta App Setup)</h2>
+          <span style="font-size: 12px; color: var(--text-muted);">
+            Manage your personal Facebook account, switch active pages, and toggle AI Auto-Boost & AI Chat Closer
+          </span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary" onclick="toggleConnectModal()">
+            <span>➕ Connect Account</span>
+          </button>
+          <button class="btn btn-secondary" onclick="loadUsersAndPages()">
+            <span>🔄 Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Connect Box (Collapsible) -->
+      <div id="connect-box" style="display: none; background: #0d121f; border: 1px solid var(--card-border); border-radius: 10px; padding: 18px; margin-bottom: 12px;">
+        <h3 style="font-size: 13px; font-weight: 700; margin-bottom: 12px; color: var(--accent);">🔑 1-Click Zero-Setup Facebook Account Connection</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+          <div class="form-group">
+            <label>Telegram User ID / Handle</label>
+            <input type="text" id="conn-telegram-id" placeholder="e.g. 859271875 or @username" value="vip_trader_cambodia">
+          </div>
+          <div class="form-group">
+            <label>Connection Method</label>
+            <select id="conn-auth-type" onchange="onAuthTypeChange()">
+              <option value="LOGIN">Direct Email & Password (Zero-Retention)</option>
+              <option value="COOKIE">Browser Cookie Session (c_user & xs)</option>
+              <option value="TOKEN">Direct Meta Access / Page Token</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="auth-fields-login" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px;">
+          <div class="form-group">
+            <label>Facebook Email / Phone</label>
+            <input type="text" id="conn-email" placeholder="user@email.com">
+          </div>
+          <div class="form-group">
+            <label>Facebook Password</label>
+            <input type="password" id="conn-password" placeholder="••••••••">
+          </div>
+        </div>
+
+        <div id="auth-fields-cookie" style="display: none; margin-top: 8px;">
+          <div class="form-group">
+            <label>Facebook Browser Cookie String</label>
+            <input type="text" id="conn-cookie" placeholder="c_user=1000847291048; xs=38%3Asample_session...">
+          </div>
+        </div>
+
+        <div id="auth-fields-token" style="display: none; margin-top: 8px;">
+          <div class="form-group">
+            <label>Access Token (User or Page Token)</label>
+            <input type="text" id="conn-token" placeholder="EAA...">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 14px;">
+          <button class="btn" onclick="submitAccountConnection()">⚡ Connect & Fetch Managed Pages</button>
+          <button class="btn btn-secondary" onclick="toggleConnectModal()">Cancel</button>
+        </div>
+        <div id="conn-status-msg" style="margin-top: 10px; font-size: 12px; display: none;"></div>
+      </div>
+
+      <!-- User Switcher & Managed Pages Table -->
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <label style="font-size: 13px;">Selected VIP Account:</label>
+          <select id="user-select" style="min-width: 220px;" onchange="onUserSelectChange()">
+            <option value="">Loading users...</option>
+          </select>
+        </div>
+        <div id="active-page-badge" style="font-size: 12px; color: var(--success); font-weight: 600;"></div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Page Name & Category</th>
+              <th>Followers</th>
+              <th>Auto-Boost</th>
+              <th>AI Chat Closer</th>
+              <th>Daily Budget</th>
+              <th>Min ROAS</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="pages-table-body">
+            <tr><td colspan="8" style="text-align:center; padding: 20px; color: var(--text-muted);">Loading managed Facebook Pages...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section: AI OFFLINE BOOST & VIRAL CREATOR ($0 Ad Spend) -->
+    <div class="section-card" style="border: 1px solid rgba(0, 242, 254, 0.4); box-shadow: 0 0 20px rgba(0, 242, 254, 0.05);">
+      <div class="section-header">
+        <div>
+          <h2>⚡ AI OFFLINE BOOST & VIRAL CREATOR (<span style="color: var(--success);">$0 Ad Spend</span>)</h2>
+          <span style="font-size: 12px; color: var(--text-muted);">
+            Explode organic reach on Facebook using Trend-Jacking, 4K HarfBuzz Studio Banners, Chuon Nath Dictionary & Audio Reels
+          </span>
+        </div>
+        <span class="badge badge-live" style="background: rgba(0, 242, 254, 0.15); color: var(--accent); border-color: var(--accent);">
+          🚀 CFA Flash Feed Core
+        </span>
+      </div>
+
+      <!-- Creation Form -->
+      <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 12px; align-items: flex-end;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label>Topic, Headline, or Product Idea (Khmer or English)</label>
+          <input type="text" id="offline-topic" placeholder="e.g. យុទ្ធសាស្ត្រលក់ដូរអនឡាញ ២០២៦ គ្មានការចំណាយ Boost" value="យុទ្ធសាស្ត្រលក់ដូរអនឡាញ ២០២៦ គ្មានការចំណាយ Boost">
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label>Banner Format</label>
+          <select id="offline-ar">
+            <option value="1:1" selected>1:1 Square (Post/IG)</option>
+            <option value="16:9">16:9 Landscape (Banner)</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label>Audio Bulletin</label>
+          <select id="offline-audio">
+            <option value="true" selected>Natural Audio Speech (.mp3)</option>
+            <option value="false">No Audio</option>
+          </select>
+        </div>
+        <button id="btn-offline-gen" class="btn" style="height: 42px; background: linear-gradient(135deg, #1877f2, #00f2fe); font-weight: 700;" onclick="generateOfflineBoost()">
+          <span>⚡ Generate 4K Package ($0)</span>
+        </button>
+      </div>
+
+      <!-- Result Card (Hidden by default) -->
+      <div id="offline-result-card" style="display: none; background: #0d121f; border: 1px solid var(--card-border); border-radius: 12px; padding: 20px; margin-top: 14px;">
+        <div style="display: grid; grid-template-columns: 340px 1fr; gap: 24px;">
+          <!-- Left: Banner Preview -->
+          <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
+            <div style="width: 100%; border-radius: 10px; overflow: hidden; border: 1px solid var(--card-border); background: #000;">
+              <img id="offline-banner-img" src="" alt="4K Generated Banner" style="width: 100%; height: auto; display: block; object-fit: cover;">
+            </div>
+            <div id="offline-audio-box" style="width: 100%; display: none;">
+              <audio id="offline-audio-player" controls style="width: 100%; height: 36px;"></audio>
+            </div>
+          </div>
+
+          <!-- Right: Telemetry & Caption -->
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+              <div>
+                <h3 id="offline-res-headline" style="font-size: 15px; font-weight: 700; color: #fff;"></h3>
+                <span id="offline-res-category" style="font-size: 11px; color: var(--accent); font-weight: 600;"></span>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <span class="tag tag-viral" id="offline-res-viral">Viral: 85/100</span>
+                <span class="tag tag-traction" id="offline-res-hook">Hook: 90/100</span>
+                <span class="tag tag-boosted" id="offline-res-cadence">Peak: 12:00 (1.65X)</span>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label>Storytelling Value-Driven Caption (Sanitized by Chuon Nath Dictionary):</label>
+              <textarea id="offline-res-caption" rows="7" style="font-size: 12px; line-height: 1.6;"></textarea>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center; margin-top: 6px;">
+              <button class="btn btn-secondary" onclick="copyOfflineCaption()">📋 Copy Caption</button>
+              <button id="btn-offline-pub" class="btn" onclick="publishOfflineBoost()">
+                <span>🚀 Publish to Connected Facebook Page ($0)</span>
+              </button>
+            </div>
+            <div id="offline-pub-status" style="font-size: 12px; text-align: right; display: none;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section: Facebook Page Live Feed & Boosts -->
+    <div class="section-card">
+      <div class="section-header">
+        <h2>📄 Connected Page Posts & Auto-Boost Status</h2>
+        <button id="btn-scan" class="btn" onclick="triggerScan()">
+          <span>🚀 Run Auto-Scan Cycle</span>
+        </button>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Format</th>
+              <th>Post Copy</th>
+              <th>Engagement</th>
+              <th>Viral Momentum</th>
+              <th>Copy Grade</th>
+              <th>Pred ROAS</th>
+              <th>Status / Action</th>
+            </tr>
+          </thead>
+          <tbody id="posts-table-body">
+            <tr><td colspan="7" style="text-align:center; padding: 20px; color: var(--text-muted);">Loading live Facebook posts...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section: AI Copywriting & ROAS Simulator -->
+    <div class="section-card">
+      <div class="section-header">
+        <h2>🧪 AI Creative Hook & ROAS Simulator Sandbox</h2>
+        <span style="font-size: 12px; color: var(--text-muted);">Test Khmer & English ad copy before boosting</span>
+      </div>
+
+      <div class="sim-grid">
+        <!-- Input Form -->
+        <div>
+          <div class="form-group">
+            <label>Facebook Post / Ad Copy (Khmer or English)</label>
+            <textarea id="sim-copy" rows="5" placeholder="Paste your Facebook post text here...">🔥 កំពូលយុទ្ធសាស្ត្រ Boost Facebook Page & Ads 2026! 🚀
+ចង់បង្កើនការលក់ 5X ដោយកាត់បន្ថយថ្លៃ Ad Spend មែនទេ?
+ចុចទីនេះដើម្បីទទួលបាន AI Quantitative Strategy ភ្លាមៗ! 💡💎 #FacebookAds #AI</textarea>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label>Creative Format</label>
+              <select id="sim-format">
+                <option value="video">Short Video (15-60s)</option>
+                <option value="reel" selected>Facebook Reel</option>
+                <option value="carousel">Carousel (Multi-Card)</option>
+                <option value="image">Single Image</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Initial Organic Shares</label>
+              <input type="number" id="sim-shares" value="45" min="0">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label>Initial Likes</label>
+              <input type="number" id="sim-likes" value="180" min="0">
+            </div>
+            <div class="form-group">
+              <label>Initial Comments</label>
+              <input type="number" id="sim-comments" value="38" min="0">
+            </div>
+          </div>
+
+          <button class="btn" style="width: 100%; justify-content: center; margin-top: 8px;" onclick="runSimulation()">
+            ⚡ Analyze with State-of-the-Art AI Models
+          </button>
+        </div>
+
+        <!-- Output Cards -->
+        <div class="sim-result-card" id="sim-result-card">
+          <h3 style="font-size: 14px; font-weight: 700; color: #fff;">📊 AI Predictive Diagnostics</h3>
+
+          <div class="result-kpi-row">
+            <div class="res-box">
+              <div id="res-roas" class="val" style="color: var(--accent);">3.45X</div>
+              <div class="lbl">Predicted ROAS</div>
+            </div>
+            <div class="res-box">
+              <div id="res-ctr" class="val" style="color: var(--success);">3.80%</div>
+              <div class="lbl">Expected CTR</div>
+            </div>
+            <div class="res-box">
+              <div id="res-cpc" class="val">0.065</div>
+              <div class="lbl">Est CPC ($)</div>
+            </div>
+          </div>
+
+          <div class="result-kpi-row">
+            <div class="res-box">
+              <div id="res-hook" class="val">85/100</div>
+              <div class="lbl">Hook Power</div>
+            </div>
+            <div class="res-box">
+              <div id="res-grade" class="val" style="color: var(--success);">A+</div>
+              <div class="lbl">Copy Grade</div>
+            </div>
+            <div class="res-box">
+              <div id="res-policy" class="val" style="color: var(--success);">SAFE</div>
+              <div class="lbl">Meta Policy</div>
+            </div>
+          </div>
+
+          <div style="background: #111726; padding: 12px; border-radius: 8px; border: 1px solid var(--card-border);">
+            <div style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">
+              AI Recommendation:
+            </div>
+            <div id="res-rec" style="font-size: 14px; font-weight: 700; color: var(--success); margin-top: 4px;">
+              STRONG BUY BOOST (High expected conversion rate)
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <span>BM AUTOMATED / FB PAGE BM AUTOMATED &copy; 2026. Standalone Fiduciary Quantitative Marketing Architecture.</span>
+    <span>Connected to Google Colab Model Trainer</span>
+  </footer>
+
+  <script>
+    async function loadStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        document.getElementById('kpi-active-boosts').textContent = data.active_boosts_count;
+        document.getElementById('kpi-daily-budget').textContent = '$' + data.total_daily_budget.toFixed(2);
+        document.getElementById('kpi-avg-roas').textContent = data.avg_predicted_roas.toFixed(2) + 'X';
+        document.getElementById('kpi-posts-count').textContent = data.posts_count;
+
+        const badge = document.getElementById('badge-mode');
+        if (data.is_mock) {
+          badge.textContent = 'Simulation Mode';
+          badge.className = 'badge badge-mock';
+        } else {
+          badge.textContent = 'Live Meta API';
+          badge.className = 'badge badge-live';
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function loadPosts() {
+      try {
+        const res = await fetch('/api/posts');
+        const posts = await res.json();
+        const tbody = document.getElementById('posts-table-body');
+        tbody.innerHTML = '';
+
+        posts.forEach(p => {
+          const tr = document.createElement('tr');
+          const isBoosted = p.status === 'BOOSTED' || p.status === 'ALREADY_ACTIVE';
+          const statusHtml = isBoosted
+            ? `<span class="tag tag-boosted">🚀 BOOSTED ($${p.daily_budget}/day)</span>`
+            : `<button class="btn btn-secondary" style="padding: 5px 10px; font-size: 11px;" onclick="manualBoost('${p.post_id}')">⚡ Boost</button>`;
+
+          tr.innerHTML = `
+            <td><span class="tag tag-traction">${p.post_type.toUpperCase()}</span></td>
+            <td><div class="post-text" title="${p.message}">${p.message}</div></td>
+            <td>❤️ ${p.likes} | 💬 ${p.comments} | 🔄 ${p.shares}</td>
+            <td><span class="tag ${p.viral_score >= 70 ? 'tag-viral' : 'tag-normal'}">${p.viral_score}/100</span></td>
+            <td><strong>${p.copy_grade}</strong></td>
+            <td><strong style="color: var(--accent);">${p.predicted_roas}X</strong></td>
+            <td>${statusHtml}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function triggerScan() {
+      const btn = document.getElementById('btn-scan');
+      btn.textContent = '⏳ Scanning...';
+      btn.disabled = true;
+      try {
+        await fetch('/api/scan', { method: 'POST' });
+        await loadStatus();
+        await loadPosts();
+      } finally {
+        btn.textContent = '🚀 Run Auto-Scan Cycle';
+        btn.disabled = false;
+      }
+    }
+
+    async function runSimulation() {
+      const payload = {
+        message: document.getElementById('sim-copy').value,
+        post_type: document.getElementById('sim-format').value,
+        likes: parseInt(document.getElementById('sim-likes').value) || 0,
+        comments: parseInt(document.getElementById('sim-comments').value) || 0,
+        shares: parseInt(document.getElementById('sim-shares').value) || 0
+      };
+
+      const res = await fetch('/api/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+
+      document.getElementById('res-roas').textContent = data.predicted_roas + 'X';
+      document.getElementById('res-ctr').textContent = data.predicted_ctr + '%';
+      document.getElementById('res-cpc').textContent = '$' + data.predicted_cpc;
+      document.getElementById('res-hook').textContent = data.hook_score + '/100';
+      document.getElementById('res-grade').textContent = data.copy_grade;
+      document.getElementById('res-policy').textContent = data.policy_pass ? 'SAFE' : 'VIOLATION';
+      document.getElementById('res-policy').style.color = data.policy_pass ? 'var(--success)' : 'var(--danger)';
+      document.getElementById('res-rec').textContent = data.recommendation;
+    }
+
+    async function manualBoost(postId) {
+      if (!confirm(`Confirm autonomous boost for post ${postId}?`)) return;
+      await fetch('/api/manual_boost', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ post_id: postId, budget: 5.0 })
+      });
+      await loadStatus();
+      await loadPosts();
+    }
+
+    // =========================================================================
+    // MULTI-TENANT VIP FACEBOOK ACCOUNT & PAGES JAVASCRIPT
+    // =========================================================================
+
+    function toggleConnectModal() {
+      const box = document.getElementById('connect-box');
+      box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function onAuthTypeChange() {
+      const type = document.getElementById('conn-auth-type').value;
+      document.getElementById('auth-fields-login').style.display = (type === 'LOGIN') ? 'grid' : 'none';
+      document.getElementById('auth-fields-cookie').style.display = (type === 'COOKIE') ? 'block' : 'none';
+      document.getElementById('auth-fields-token').style.display = (type === 'TOKEN') ? 'block' : 'none';
+    }
+
+    async function loadUsersAndPages() {
+      try {
+        const res = await fetch('/api/multitenant/users');
+        const users = await res.json();
+        const select = document.getElementById('user-select');
+        select.innerHTML = '';
+
+        if (!users || users.length === 0) {
+          select.innerHTML = '<option value="">No VIP users connected yet</option>';
+          renderPagesTable([]);
+          return;
+        }
+
+        users.forEach((u, i) => {
+          const opt = document.createElement('option');
+          opt.value = u.telegram_id;
+          opt.textContent = `${u.fb_name} (ID: ${u.telegram_id}) - [${u.page_count} Pages]`;
+          select.appendChild(opt);
+        });
+
+        const activeTId = select.value;
+        if (activeTId) {
+          loadPagesForUser(activeTId);
+        }
+      } catch (e) {
+        console.error("Failed to load users:", e);
+      }
+    }
+
+    async function onUserSelectChange() {
+      const select = document.getElementById('user-select');
+      if (select.value) {
+        loadPagesForUser(select.value);
+      }
+    }
+
+    async function loadPagesForUser(telegramId) {
+      try {
+        const res = await fetch(`/api/multitenant/pages?telegram_id=${encodeURIComponent(telegramId)}`);
+        const pages = await res.json();
+        renderPagesTable(pages, telegramId);
+      } catch (e) {
+        console.error("Failed to load pages:", e);
+      }
+    }
+
+    function renderPagesTable(pages, telegramId) {
+      const tbody = document.getElementById('pages-table-body');
+      tbody.innerHTML = '';
+
+      if (!pages || pages.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px; color: var(--text-muted);">No managed pages found for this user. Click "Connect Account" to link pages.</td></tr>';
+        document.getElementById('active-page-badge').textContent = '';
+        return;
+      }
+
+      const activePage = pages.find(p => p.is_active);
+      if (activePage) {
+        document.getElementById('active-page-badge').textContent = `🟢 Active Target Page: ${activePage.page_name} (${activePage.page_id})`;
+      } else {
+        document.getElementById('active-page-badge').textContent = '⚪ No page selected as active';
+      }
+
+      pages.forEach(p => {
+        const tr = document.createElement('tr');
+        const statusBadge = p.is_active
+          ? '<span class="tag tag-viral">🟢 ACTIVE</span>'
+          : `<button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="selectActivePage('${telegramId}', '${p.page_id}')">Select</button>`;
+
+        const boostBtn = p.is_active_boost
+          ? `<button class="tag tag-viral" style="cursor:pointer; border:none;" onclick="togglePageBoost('${telegramId}', '${p.page_id}', false)">ON 🚀</button>`
+          : `<button class="tag tag-normal" style="cursor:pointer; border:none;" onclick="togglePageBoost('${telegramId}', '${p.page_id}', true)">OFF ⏸️</button>`;
+
+        const chatBtn = p.is_active_chat
+          ? `<button class="tag tag-traction" style="cursor:pointer; border:none;" onclick="togglePageChat('${telegramId}', '${p.page_id}', false)">ON 💬</button>`
+          : `<button class="tag tag-normal" style="cursor:pointer; border:none;" onclick="togglePageChat('${telegramId}', '${p.page_id}', true)">OFF ⏸️</button>`;
+
+        tr.innerHTML = `
+          <td>${statusBadge}</td>
+          <td>
+            <strong>${p.page_name}</strong><br>
+            <span style="font-size: 11px; color: var(--text-muted);">${p.category} | ID: <code>${p.page_id}</code></span>
+          </td>
+          <td>${p.followers_count.toLocaleString()}</td>
+          <td>${boostBtn}</td>
+          <td>${chatBtn}</td>
+          <td>
+            <input type="number" id="budget-${p.page_id}" value="${p.daily_budget_usd}" style="width: 75px; padding: 4px;" min="1" step="1">
+          </td>
+          <td>
+            <input type="number" id="roas-${p.page_id}" value="${p.min_roas_hurdle}" style="width: 65px; padding: 4px;" min="1.0" step="0.1">
+          </td>
+          <td>
+            <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="savePageSettings('${telegramId}', '${p.page_id}')">💾 Save</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function selectActivePage(telegramId, pageId) {
+      await fetch('/api/multitenant/select_page', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telegram_id: telegramId, page_id: pageId })
+      });
+      loadPagesForUser(telegramId);
+      loadStatus();
+    }
+
+    async function togglePageBoost(telegramId, pageId, newState) {
+      await fetch('/api/multitenant/update_page', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telegram_id: telegramId, page_id: pageId, is_active_boost: newState })
+      });
+      loadPagesForUser(telegramId);
+    }
+
+    async function togglePageChat(telegramId, pageId, newState) {
+      await fetch('/api/multitenant/update_page', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telegram_id: telegramId, page_id: pageId, is_active_chat: newState })
+      });
+      loadPagesForUser(telegramId);
+    }
+
+    async function savePageSettings(telegramId, pageId) {
+      const budget = parseFloat(document.getElementById(`budget-${pageId}`).value) || 5.0;
+      const roas = parseFloat(document.getElementById(`roas-${pageId}`).value) || 2.2;
+      await fetch('/api/multitenant/update_page', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegram_id: telegramId,
+          page_id: pageId,
+          daily_budget_usd: budget,
+          min_roas_hurdle: roas
+        })
+      });
+      alert(`Settings saved for Page ${pageId}! Budget: $${budget}/day, Min ROAS: ${roas}X`);
+      loadPagesForUser(telegramId);
+    }
+
+    async function submitAccountConnection() {
+      const statusMsg = document.getElementById('conn-status-msg');
+      statusMsg.style.display = 'block';
+      statusMsg.innerHTML = '⏳ Connecting and discovering managed Facebook pages...';
+      statusMsg.style.color = 'var(--text-muted)';
+
+      const tId = document.getElementById('conn-telegram-id').value.trim() || 'web_vip_user';
+      const authType = document.getElementById('conn-auth-type').value;
+
+      const payload = {
+        telegram_id: tId,
+        auth_type: authType,
+        email: document.getElementById('conn-email').value.trim(),
+        password: document.getElementById('conn-password').value.trim(),
+        cookie: document.getElementById('conn-cookie').value.trim(),
+        token: document.getElementById('conn-token').value.trim()
+      };
+
+      try {
+        const res = await fetch('/api/multitenant/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          statusMsg.innerHTML = `✅ Successfully connected <b>${data.user_name}</b>! Found <b>${data.pages_count}</b> Facebook Pages.`;
+          statusMsg.style.color = 'var(--success)';
+          setTimeout(() => {
+            toggleConnectModal();
+            statusMsg.style.display = 'none';
+          }, 2000);
+          await loadUsersAndPages();
+          const select = document.getElementById('user-select');
+          select.value = tId;
+          await loadPagesForUser(tId);
+        } else {
+          statusMsg.innerHTML = `❌ Connection error: ${data.message || 'Authentication failed'}`;
+          statusMsg.style.color = 'var(--danger)';
+        }
+      } catch (e) {
+        statusMsg.innerHTML = `❌ Connection error: ${e.message}`;
+        statusMsg.style.color = 'var(--danger)';
+      }
+    }
+
+    // =========================================================================
+    // AI OFFLINE BOOST & VIRAL CREATOR JAVASCRIPT
+    // =========================================================================
+
+    let currentOfflinePackage = null;
+
+    async function generateOfflineBoost() {
+      const topic = document.getElementById('offline-topic').value.trim() || 'យុទ្ធសាស្ត្រលក់ដូរអនឡាញ ២០២៦';
+      const ar = document.getElementById('offline-ar').value;
+      const audio = document.getElementById('offline-audio').value === 'true';
+
+      const btn = document.getElementById('btn-offline-gen');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<span>⏳ Generating 4K Package...</span>';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/offline_boost/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic, aspect_ratio: ar, include_audio: audio })
+        });
+        const data = await res.json();
+        if (data.success) {
+          currentOfflinePackage = data;
+          document.getElementById('offline-result-card').style.display = 'block';
+
+          if (data.banner_url) {
+            document.getElementById('offline-banner-img').src = data.banner_url;
+            document.getElementById('offline-banner-img').style.display = 'block';
+          } else {
+            document.getElementById('offline-banner-img').style.display = 'none';
+          }
+
+          if (data.audio_url) {
+            const player = document.getElementById('offline-audio-player');
+            player.src = data.audio_url;
+            document.getElementById('offline-audio-box').style.display = 'block';
+          } else {
+            document.getElementById('offline-audio-box').style.display = 'none';
+          }
+
+          document.getElementById('offline-res-headline').textContent = data.headline;
+          document.getElementById('offline-res-category').textContent = data.viral_category;
+          document.getElementById('offline-res-viral').textContent = `Viral: ${data.viral_score.toFixed(0)}/100`;
+          document.getElementById('offline-res-hook').textContent = `Hook: ${data.hook_score.toFixed(0)}/100 (${data.copy_grade})`;
+          document.getElementById('offline-res-cadence').textContent = `Peak: ${data.circadian_optimal_hour}:00 (${data.circadian_boost_multiplier}X)`;
+          document.getElementById('offline-res-caption').value = data.caption;
+        } else {
+          alert("Error generating package: " + (data.message || 'Unknown error'));
+        }
+      } catch (e) {
+        alert("Failed to connect to generator: " + e.message);
+      } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+      }
+    }
+
+    async function publishOfflineBoost() {
+      if (!currentOfflinePackage) return;
+      const select = document.getElementById('user-select');
+      const telegramId = select.value;
+      if (!telegramId) {
+        alert("Please connect or select a VIP user account first!");
+        return;
+      }
+
+      const btn = document.getElementById('btn-offline-pub');
+      const statusDiv = document.getElementById('offline-pub-status');
+      btn.disabled = true;
+      statusDiv.style.display = 'block';
+      statusDiv.innerHTML = '⏳ Publishing to connected page...';
+      statusDiv.style.color = 'var(--text-muted)';
+
+      try {
+        const payload = {
+          telegram_id: telegramId,
+          topic: currentOfflinePackage.topic,
+          headline: currentOfflinePackage.headline,
+          caption: document.getElementById('offline-res-caption').value,
+          banner_path: currentOfflinePackage.banner_path
+        };
+        const res = await fetch('/api/offline_boost/publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          statusDiv.innerHTML = `🎉 <b>Published Successfully!</b> Post ID: <code>${data.post_id}</code> on Page <b>${data.page_name || ''}</b>! (Cost: $0.00)`;
+          statusDiv.style.color = 'var(--success)';
+          await loadPosts();
+        } else {
+          statusDiv.innerHTML = `❌ Error: ${data.message || 'Publishing failed'}`;
+          statusDiv.style.color = 'var(--danger)';
+        }
+      } catch (e) {
+        statusDiv.innerHTML = `❌ Error: ${e.message}`;
+        statusDiv.style.color = 'var(--danger)';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function copyOfflineCaption() {
+      const textarea = document.getElementById('offline-res-caption');
+      textarea.select();
+      document.execCommand('copy');
+      alert("Caption copied to clipboard!");
+    }
+
+    // Initialize
+    loadStatus();
+    loadPosts();
+    loadUsersAndPages();
+  </script>
+</body>
+</html>
+
