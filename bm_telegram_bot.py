@@ -95,6 +95,40 @@ class BMTelegramBot:
 
         # Autonomous 4K Brand Trainer & Publisher Engine
         self.page_publisher = PageAutonomousPublisherEngine.get_instance()
+        self._cached_public_ip: Optional[str] = None
+
+    def _get_cached_public_ip(self) -> str:
+        """Dynamically detects and caches the external public IP of the host/VPS."""
+        if self._cached_public_ip:
+            return self._cached_public_ip
+
+        # 1. GCP Internal Metadata Server
+        try:
+            r = requests.get(
+                "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip",
+                headers={"Metadata-Flavor": "Google"},
+                timeout=2
+            )
+            if r.status_code == 200 and r.text.strip():
+                self._cached_public_ip = r.text.strip()
+                logger.info(f"Discovered GCP VPS External IP: {self._cached_public_ip}")
+                return self._cached_public_ip
+        except Exception:
+            pass
+
+        # 2. Public IP APIs
+        for endpoint in ("https://api.ipify.org", "https://ifconfig.me/ip", "https://icanhazip.com"):
+            try:
+                r = requests.get(endpoint, timeout=3)
+                if r.status_code == 200 and r.text.strip():
+                    self._cached_public_ip = r.text.strip()
+                    logger.info(f"Discovered Public IP via {endpoint}: {self._cached_public_ip}")
+                    return self._cached_public_ip
+            except Exception:
+                pass
+
+        self._cached_public_ip = "127.0.0.1"
+        return self._cached_public_ip
 
     @property
     def is_configured(self) -> bool:
@@ -220,8 +254,16 @@ class BMTelegramBot:
                 {"text": "📈 System Status", "callback_data": "cmd_status"}
             ])
 
+        public_ip = self._get_cached_public_ip()
+        port = config.web_port
+        web_btn = (
+            {"text": "🌐 Web GUI Dashboard", "url": f"http://{public_ip}:{port}"}
+            if public_ip != "127.0.0.1"
+            else {"text": "🌐 Web GUI Dashboard", "callback_data": "cmd_web_dashboard"}
+        )
+
         buttons.append([
-            {"text": "🌐 Web GUI Dashboard", "callback_data": "cmd_web_dashboard"},
+            web_btn,
             {"text": "❓ Help & Commands", "callback_data": "cmd_help"}
         ])
 
@@ -698,10 +740,18 @@ class BMTelegramBot:
 
     def handle_fb_login_guide(self, chat_id: str):
         """Presents instructions for connecting real Facebook Pages safely."""
+        public_ip = self._get_cached_public_ip()
+        port = config.web_port
+        web_url = f"http://{public_ip}:{port}" if public_ip != "127.0.0.1" else f"http://localhost:{port}"
+        oauth_url = f"{web_url}/fb_login_redirect?state={chat_id}"
+
         msg = (
             "🔑 <b>ការភ្ជាប់ FACEBOOK PAGE ពិតប្រាកដ (REAL FACEBOOK PAGES)</b>\n"
             "<i>(អនុវត្តតាមស្តង់ដារផ្លូវការរបស់ Meta Graph API ការពារគណនី ១០០%)</i>\n"
             "────────────────────────────\n"
+            f"🌐 <b>ជម្រើសពិសេសទី ០ (ចូលតាម Web Login លើ Linux VPS ងាយស្រួលបំផុត):</b>\n"
+            f"👉 <b>Web Login URL:</b> <a href=\"{web_url}\">{web_url}</a>\n"
+            "<i>(បើក Browser លើទូរស័ព្ទដៃ ឬកុំព្យូទ័រ ដើម្បី Login តាម Facebook App ដោយផ្ទាល់ ឬ Paste Token 1-Click!)</i>\n\n"
             "👉 <b>ជម្រើសទី ១ (ស្តង់ដារផ្លូវការ & ពេញនិយមបំផុត - Page Access Token):</b>\n"
             "វាយបញ្ជា៖ <code>/fb_token &lt;Page_Access_Token&gt;</code>\n"
             "ឧទាហរណ៍៖ <code>/fb_token EAAB12345...</code>\n"
@@ -717,11 +767,26 @@ class BMTelegramBot:
             "• <code>META_PAGE_ID=\"ID_Page_របស់បង\"</code>\n"
             "• <code>META_IS_MOCK=false</code>\n"
             "────────────────────────────\n"
-            "⚠️ <b>ចំណាំសំខាន់៖</b> Meta (Facebook) គ្មាន API អនុញ្ញាតឱ្យ App ក្រៅយក Email និង Password "
-            "ទៅ Login ដោយផ្ទាល់ឡើយ ដើម្បីការពារគណនីពីការត្រូវ Facebook Checkpoint/Lock! "
-            "សូមប្រើ <b>/fb_token</b> ឬ <b>/fb_cookie</b> ដើម្បីភ្ជាប់ Page ពិតប្រាកដដោយសុវត្ថិភាព!"
+            "💡 <b>ចុចប៊ូតុងខាងក្រោមដើម្បីបើក Web Login ឬ Login តាម Facebook App ដោយផ្ទាល់!</b>"
         )
-        self.send_message(chat_id, msg)
+
+        buttons = []
+        if public_ip != "127.0.0.1":
+            buttons.append([
+                {"text": "🌐 បើក Web Login (Port 8088)", "url": web_url},
+                {"text": "🚀 1-Click Facebook App Login", "url": oauth_url}
+            ])
+        else:
+            buttons.append([
+                {"text": "🌐 ព័ត៌មាន Web GUI Dashboard", "callback_data": "cmd_web_dashboard"}
+            ])
+        buttons.append([
+            {"text": "📄 មើល Pages សកម្ម (/fb_pages)", "callback_data": "cmd_fb_pages"},
+            {"text": "❓ ជំនួយ (/help)", "callback_data": "cmd_help"}
+        ])
+
+        keyboard = {"inline_keyboard": buttons}
+        self.send_message(chat_id, msg, reply_markup=keyboard)
 
     def handle_fb_login(self, chat_id: str, text: str):
         """Processes /fb_login command with Meta policy explanation and token guidance."""
@@ -1081,22 +1146,39 @@ class BMTelegramBot:
         self.send_message(chat_id, help_text)
 
     def handle_web_dashboard_info(self, chat_id: str):
-        """Displays Web GUI access URL and instructions."""
+        """Displays Web GUI access URL and instructions with live external IP."""
         port = config.web_port
+        public_ip = self._get_cached_public_ip()
+        web_url = f"http://{public_ip}:{port}" if public_ip != "127.0.0.1" else f"http://localhost:{port}"
+        oauth_url = f"{web_url}/fb_login_redirect?state={chat_id}"
+
         msg = (
             "🌐 <b>FB PAGE BM AUTOMATED - WEB GUI DASHBOARD</b>\n"
             "────────────────────────────\n"
-            f"• <b>Web Port:</b> <code>{port}</code>\n"
-            f"• <b>Localhost Access:</b> <code>http://localhost:{port}</code>\n"
-            f"• <b>Linux VPS Access:</b> <code>http://&lt;VPS_IP&gt;:{port}</code>\n"
+            f"• <b>Web Dashboard URL:</b> <code>{web_url}</code>\n"
+            f"• <b>Web Port:</b> <code>{port}</code> (TCP)\n"
+            f"• <b>Meta API Status:</b> {'🛡️ Simulation' if self.api_client.is_mock else '🟢 Live Connected'}\n"
             "────────────────────────────\n"
-            "💡 <b>របៀបចូលប្រើប្រាស់ Web Dashboard៖</b>\n"
-            "1. <b>បើដំណើរការលើកុំព្យូទ័រផ្ទាល់៖</b> បើក Browser ហើយចូលទៅ <code>http://localhost:8088</code>\n"
-            "2. <b>បើដំណើរការលើ Google Cloud VPS៖</b> បើក Browser លើទូរស័ព្ទដៃ ឬកុំព្យូទ័រ "
-            "ហើយចូលតាម External IP របស់ VPS ឧទាហរណ៍៖ <code>http://34.x.x.x:8088</code>\n"
-            "<i>(ចំណាំ៖ ត្រូវប្រាកដថា Firewall Rule លើ Google Cloud Console បានបើកអនុញ្ញាត Allow TCP Port 8088)</i>"
+            "💡 <b>របៀបចូលប្រើប្រាស់ Web Dashboard & Web Login៖</b>\n"
+            f"👉 <b>ចុចបើកផ្ទាល់៖</b> <a href=\"{web_url}\">{web_url}</a>\n"
+            "• អាចបើកបានទាំងលើ <b>Smartphone (Safari, Chrome)</b> ឬ <b>PC Browser</b>\n"
+            "• ក្នុង Web Dashboard មានផ្ទាំង <b>➕ Connect Account</b> សម្រាប់ភ្ជាប់ Page ដោយផ្ទាល់ ឬចុច <b>1-Click Facebook App Login</b>!\n\n"
+            "<i>(ចំណាំ៖ ប្រសិនបើចុច Link ហើយមិនទាន់ដើរ សូមប្រាកដថា Google Cloud Firewall Rule បាន Allow Port 8088 លើ VPS)</i>"
         )
-        self.send_message(chat_id, msg)
+
+        buttons = []
+        if public_ip != "127.0.0.1":
+            buttons.append([
+                {"text": "🌐 បើក Web Dashboard លើ VPS", "url": web_url},
+                {"text": "🚀 1-Click Facebook Login", "url": oauth_url}
+            ])
+        buttons.append([
+            {"text": "🔑 របៀបភ្ជាប់ Facebook (/fb_guide)", "callback_data": "cmd_fb_login_guide"},
+            {"text": "📈 System Status", "callback_data": "cmd_status"}
+        ])
+
+        keyboard = {"inline_keyboard": buttons}
+        self.send_message(chat_id, msg, reply_markup=keyboard)
 
     def handle_status(self, chat_id: str):
         """Displays system health, VPS resources, and bot operational state."""
@@ -1272,6 +1354,7 @@ class BMTelegramBot:
 
         vip_commands = [
             {"command": "start", "description": "🚀 បើកផ្ទាំង Dashboard ចម្បង & Status"},
+            {"command": "web", "description": "🌐 បើក Web Dashboard & Web Login លើ VPS"},
             {"command": "auto_publish", "description": "⏱️ កាលវិភាគ 4K Multi-Photo Publisher (1h/2h)"},
             {"command": "train_page", "description": "🧠 សិក្សា Brand DNA & ផលិតផល Page ផ្ទាល់ខ្លួន"},
             {"command": "publish_now", "description": "🚀 បង្កើត & ផុស 4K Multi-Photo Campaign ភ្លាមៗ"},
@@ -1295,6 +1378,7 @@ class BMTelegramBot:
 
         admin_commands = [
             {"command": "start", "description": "🚀 បើកផ្ទាំង Dashboard ចម្បង & Status"},
+            {"command": "web", "description": "🌐 បើក Web Dashboard & Web Login លើ VPS"},
             {"command": "admin_status", "description": "📊 Institutional VPS, CPU, RAM & Bot Health"},
             {"command": "admin_users", "description": "👥 បញ្ជី Multi-Tenant Users ទាំងអស់"},
             {"command": "admin_pages", "description": "📑 បញ្ជី Facebook Pages ទាំងអស់ក្នុងប្រព័ន្ធ"},
@@ -1456,6 +1540,8 @@ class BMTelegramBot:
                             self.handle_fb_logout(chat_id)
                         elif text in ("/fb_connect", "/fb_guide"):
                             self.handle_fb_login_guide(chat_id)
+                        elif text in ("/web", "/dashboard", "/gui"):
+                            self.handle_web_dashboard_info(chat_id)
                         elif text.startswith("/generate"):
                             topic = text.replace("/generate", "", 1).strip()
                             self.handle_generate(chat_id, topic)
@@ -1551,6 +1637,8 @@ class BMTelegramBot:
                     self.handle_fb_logout("terminal_user")
                 elif cmd in ("/fb_connect", "/fb_guide"):
                     self.handle_fb_login_guide("terminal_user")
+                elif cmd in ("/web", "/dashboard", "/gui"):
+                    self.handle_web_dashboard_info("terminal_user")
                 elif cmd.startswith("/generate"):
                     topic = cmd.replace("/generate", "", 1).strip()
                     self.handle_generate("terminal_user", topic)
