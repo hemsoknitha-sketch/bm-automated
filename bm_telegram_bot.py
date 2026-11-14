@@ -918,10 +918,10 @@ class BMTelegramBot:
                     except Exception:
                         pass
 
-        print("=" * 80)
-        print("🤖 [BM TELEGRAM BOT] STARTED 24/7 TELEGRAM LONG POLLING...")
-        print(f"🔒 Admin Chat ID: {self.admin_id or 'Any User'}")
-        print("======================================================================")
+        print("=" * 80, flush=True)
+        print("🤖 [BM TELEGRAM BOT] STARTED 24/7 TELEGRAM LONG POLLING...", flush=True)
+        print(f"🔒 Admin Chat ID: {self.admin_id or 'Any User'}", flush=True)
+        print("======================================================================", flush=True)
 
         # Notify admin of startup
         self.send_admin_alert("🚀 <b>FB PAGE BM AUTOMATED BOT IS ONLINE!</b>\nServer: Linux Google VPS (24/7 LIVE)")
@@ -947,6 +947,8 @@ class BMTelegramBot:
 
                         if not text:
                             continue
+
+                        logger.info(f"📩 [MESSAGE RECEIVED] Chat ID: {chat_id} | Command: {text[:80]}")
 
                         # Command routing
                         if text in ("/start", "/menu"):
