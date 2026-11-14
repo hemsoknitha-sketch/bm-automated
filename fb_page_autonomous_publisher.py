@@ -200,7 +200,6 @@ class PageAutonomousPublisherEngine:
         """
         page_id = client.page_id
         logger.info(f"📸 [STAGE 2] Mining product photos for [{dna.brand_name}] (Target: {target_count} photos)...")
-        uploaded = client.get_page_uploaded_photos(limit=35)
 
         # Download or gather original image paths
         page_cache_dir = ASSETS_CACHE_DIR / page_id
@@ -209,40 +208,47 @@ class PageAutonomousPublisherEngine:
         selected_photos = []
         photo_hashes = []
 
-        import requests
-        for idx, p in enumerate(uploaded):
-            src = p.get("source")
-            if not src:
-                continue
-            # Quality filter: skip very small thumbnails
-            w = p.get("width", 0)
-            h = p.get("height", 0)
-            if w > 0 and w < 600:
-                continue
-
-            # Local cache download
-            img_hash = hashlib.md5(src.encode("utf-8")).hexdigest()[:10]
-            local_path = page_cache_dir / f"orig_{img_hash}.jpg"
-
-            if not local_path.exists():
-                try:
-                    r = requests.get(src, timeout=15)
-                    if r.status_code == 200:
-                        with open(local_path, "wb") as f:
-                            f.write(r.content)
-                except Exception as e:
-                    logger.warning(f"Could not download photo {src[:50]}: {e}")
-
-            if local_path.exists():
-                selected_photos.append(str(local_path))
-                photo_hashes.append(img_hash)
-
-            if len(selected_photos) >= target_count:
-                break
-
-        # Fallback if page has fewer than target_count photos
-        if len(selected_photos) < 3:
+        if client.is_mock:
+            # In simulation/mock mode, generate crisp studio fallback photos to eliminate network timeouts
             selected_photos = self._generate_fallback_product_photos(page_cache_dir, dna, target_count)
+            photo_hashes = [hashlib.md5(p.encode()).hexdigest()[:10] for p in selected_photos]
+        else:
+            uploaded = client.get_page_uploaded_photos(limit=35)
+            import requests
+            for idx, p in enumerate(uploaded):
+                src = p.get("source")
+                if not src:
+                    continue
+                # Quality filter: skip very small thumbnails
+                w = p.get("width", 0)
+                h = p.get("height", 0)
+                if w > 0 and w < 600:
+                    continue
+
+                # Local cache download
+                img_hash = hashlib.md5(src.encode("utf-8")).hexdigest()[:10]
+                local_path = page_cache_dir / f"orig_{img_hash}.jpg"
+
+                if not local_path.exists():
+                    try:
+                        r = requests.get(src, timeout=10)
+                        if r.status_code == 200:
+                            with open(local_path, "wb") as f:
+                                f.write(r.content)
+                    except Exception as e:
+                        logger.warning(f"Could not download photo {src[:50]}: {e}")
+
+                if local_path.exists():
+                    selected_photos.append(str(local_path))
+                    photo_hashes.append(img_hash)
+
+                if len(selected_photos) >= target_count:
+                    break
+
+            # Fallback if page has fewer than target_count photos
+            if len(selected_photos) < 3:
+                selected_photos = self._generate_fallback_product_photos(page_cache_dir, dna, target_count)
+                photo_hashes = [hashlib.md5(p.encode()).hexdigest()[:10] for p in selected_photos]
             photo_hashes = [hashlib.md5(p.encode()).hexdigest()[:10] for p in selected_photos]
 
         # Select a product name from DNA

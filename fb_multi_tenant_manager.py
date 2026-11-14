@@ -22,6 +22,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, asdict
+from contextlib import contextmanager
 from cryptography.fernet import Fernet
 
 logger = logging.getLogger("BM_AUTOMATED.MultiTenant")
@@ -97,10 +98,18 @@ class MultiTenantManager:
             cls._instance = cls()
         return cls._instance
 
-    def _get_connection(self) -> sqlite3.Connection:
+    @contextmanager
+    def _get_connection(self):
         conn = sqlite3.connect(str(self.db_path), timeout=15.0)
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def _init_database(self):
         """Initializes normalized database schema with indices."""
