@@ -49,7 +49,7 @@ class SmartBudgetBandit:
         self.max_budget_usd = max_budget_usd
         self.stop_loss_roas = stop_loss_roas
         self.target_roas_scale = target_roas_scale
-        self.policy_path = policy_path or (Path(__file__).resolve().parent.parent / "models" / "fb_bandit_policy.json")
+        self.policy_path = policy_path or (Path(__file__).resolve().parent / "models" / "fb_bandit_policy.json")
         self.history: Dict[str, Dict[str, Any]] = {}
         self._load_policy()
 

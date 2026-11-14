@@ -464,3 +464,334 @@ class MetaGraphAPIClient:
             logger.error(f"Error reading ad insights: {e}")
         return {}
 
+    def publish_page_post(self, message: str, image_url: Optional[str] = None) -> Dict[str, Any]:
+        """Publishes a new text or photo post directly to the Facebook Page feed."""
+        if self.is_mock:
+            mock_id = f"{self.page_id}_post_{int(time.time())}"
+            logger.info(f"[SIMULATION] Published post {mock_id} to page: {message[:50]}...")
+            return {"id": mock_id, "status": "PUBLISHED_SIMULATION"}
+
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+        endpoint = f"{self.GRAPH_URL}/{self.api_version}/{self.page_id}/photos" if image_url else f"{self.GRAPH_URL}/{self.api_version}/{self.page_id}/feed"
+        payload = {"message": message}
+        if image_url:
+            payload["url"] = image_url
+
+        try:
+            resp = requests.post(endpoint, data=payload, headers=headers, timeout=15)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            logger.error(f"Failed to publish post: {e}")
+            return {"error": str(e)}
+
+    def get_page_profile_details(self) -> Dict[str, Any]:
+        """Retrieves page profile, contact info, category, and location."""
+        if self.is_mock:
+            return {
+                "id": self.page_id or "page101",
+                "name": "Angkor Quant AI Store",
+                "category": "E-commerce & AI Technology",
+                "phone": "+855 85 927 1875",
+                "emails": ["contact@angkorquant.com"],
+                "website": "https://angkorquant.com",
+                "single_line_address": "Street 2004, Phnom Penh, Cambodia",
+                "location": {"city": "Phnom Penh", "country": "Cambodia", "latitude": 11.5564, "longitude": 104.9282},
+                "about": "ឈានមុខគេលើបច្ចេកវិទ្យា AI ទីផ្សារឌីជីថល ស្វ័យប្រវត្តិកម្ម និងផលិតផលគុណភាពខ្ពស់ស្តង់ដារអន្តរជាតិ។"
+            }
+
+        url = f"{self.GRAPH_URL}/{self.api_version}/{self.page_id}"
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+        params = {"fields": "id,name,about,description,category,phone,emails,website,single_line_address,location"}
+        try:
+            resp = requests.get(url, headers=headers, params=params, timeout=12)
+            if resp.status_code == 200:
+                return resp.json()
+        except Exception as e:
+            logger.error(f"Error fetching page profile details: {e}")
+        return {"id": self.page_id, "name": "Facebook Page"}
+
+    def get_page_uploaded_photos(self, limit: int = 30) -> List[Dict[str, Any]]:
+        """Retrieves high-resolution uploaded photos directly from the Page's albums."""
+        if self.is_mock:
+            return [
+                {
+                    "id": f"photo_{i}",
+                    "name": f"Product Item Angle {i}",
+                    "source": f"https://picsum.photos/seed/product_{i}/1200/1200",
+                    "width": 1200,
+                    "height": 1200,
+                    "created_time": time.strftime("%Y-%m-%dT%H:%M:%S+0000", time.gmtime(time.time() - i * 3600))
+                }
+                for i in range(1, 10)
+            ]
+
+        url = f"{self.GRAPH_URL}/{self.api_version}/{self.page_id}/photos"
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+        params = {"type": "uploaded", "fields": "id,images,name,created_time", "limit": limit}
+        try:
+            resp = requests.get(url, headers=headers, params=params, timeout=15)
+            if resp.status_code == 200:
+                data = resp.json().get("data", [])
+                results = []
+                for p in data:
+                    images = p.get("images", [])
+                    src = images[0].get("source") if images else ""
+                    w = images[0].get("width", 0) if images else 0
+                    h = images[0].get("height", 0) if images else 0
+                    results.append({
+                        "id": p.get("id"),
+                        "name": p.get("name", "Product Image"),
+                        "source": src,
+                        "width": w,
+                        "height": h,
+                        "created_time": p.get("created_time")
+                    })
+                return results
+        except Exception as e:
+            logger.error(f"Error fetching uploaded page photos: {e}")
+        return []
+
+    def publish_multi_photo_post(self, message: str, image_paths_or_urls: List[str]) -> Dict[str, Any]:
+        """
+        Publishes an institutional Multi-Photo post (3 to 5 images) directly to the Facebook Page feed.
+        Implements 2-phase atomic upload:
+        Phase 1: Upload each image as unpublished (published=false) to acquire photo IDs.
+        Phase 2: Attach all photo IDs to a single feed post with the master caption.
+        """
+        if self.is_mock:
+            mock_id = f"{self.page_id}_multiphoto_{int(time.time())}"
+            logger.info(f"[SIMULATION] Published Multi-Photo Post ({len(image_paths_or_urls)} photos) {mock_id}: {message[:50]}...")
+            return {
+                "id": mock_id,
+                "photo_count": len(image_paths_or_urls),
+                "status": "PUBLISHED_MULTI_PHOTO_SIMULATION",
+                "post_url": f"https://facebook.com/{mock_id}"
+            }
+
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+        photo_ids = []
+
+        # Phase 1: Upload unpublished photos
+        for item in image_paths_or_urls:
+            endpoint = f"{self.GRAPH_URL}/{self.api_version}/{self.page_id}/photos"
+            try:
+                if os.path.exists(item):
+                    with open(item, "rb") as f:
+                        resp = requests.post(
+                            endpoint,
+                            data={"published": "false"},
+                            files={"source": f},
+                            headers=headers,
+                            timeout=25
+                        )
+                else:
+                    resp = requests.post(
+                        endpoint,
+                        data={"url": item, "published": "false"},
+                        headers=headers,
+                        timeout=25
+                    )
+                if resp.status_code == 200:
+                    p_id = resp.json().get("id")
+                    if p_id:
+                        photo_ids.append(p_id)
+                else:
+                    logger.warning(f"Failed to upload photo item: {resp.text}")
+            except Exception as e:
+                logger.error(f"Error uploading photo item: {e}")
+
+        if not photo_ids:
+            return {"error": "Failed to upload any photos for multi-photo post."}
+
+        # Phase 2: Create feed post with attached_media
+        feed_endpoint = f"{self.GRAPH_URL}/{self.api_version}/{self.page_id}/feed"
+        attached_media = json.dumps([{"media_fbid": pid} for pid in photo_ids])
+        payload = {
+            "message": message,
+            "attached_media": attached_media
+        }
+
+        try:
+            resp = requests.post(feed_endpoint, data=payload, headers=headers, timeout=20)
+            resp.raise_for_status()
+            res_json = resp.json()
+            post_id = res_json.get("id", "new_post")
+            return {
+                "id": post_id,
+                "photo_count": len(photo_ids),
+                "photo_ids": photo_ids,
+                "post_url": f"https://facebook.com/{post_id}"
+            }
+        except Exception as e:
+            logger.error(f"Failed to publish multi-photo feed post: {e}")
+            return {"error": str(e)}
+
+    def reply_to_comment(self, comment_id: str, message: str) -> bool:
+        """Sends a public comment reply to a user's comment."""
+        if self.is_mock:
+            logger.info(f"[SIMULATION] Replied to comment {comment_id}: {message[:40]}...")
+            return True
+
+        url = f"{self.GRAPH_URL}/{self.api_version}/{comment_id}/comments"
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+        try:
+            resp = requests.post(url, data={"message": message}, headers=headers, timeout=10)
+            return resp.status_code == 200
+        except Exception as e:
+            logger.error(f"Failed to reply to comment: {e}")
+            return False
+
+    def send_private_reply_to_comment(self, comment_id: str, message: str) -> bool:
+        """Sends an automated private Messenger DM reply to a user who commented."""
+        if self.is_mock:
+            logger.info(f"[SIMULATION] Sent Private Messenger DM for comment {comment_id}")
+            return True
+
+        url = f"{self.GRAPH_URL}/{self.api_version}/{self.page_id}/messages"
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+        payload = {
+            "recipient": json.dumps({"comment_id": comment_id}),
+            "message": json.dumps({"text": message})
+        }
+        try:
+            resp = requests.post(url, data=payload, headers=headers, timeout=10)
+            return resp.status_code == 200
+        except Exception as e:
+            logger.error(f"Failed to send private reply: {e}")
+            return False
+
+    def hide_comment(self, comment_id: str) -> bool:
+        """Hides a spam or offensive comment from public view."""
+        if self.is_mock:
+            logger.info(f"[SIMULATION] Hidden comment {comment_id}")
+            return True
+
+        url = f"{self.GRAPH_URL}/{self.api_version}/{comment_id}"
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+        try:
+            resp = requests.post(url, data={"is_hidden": "true"}, headers=headers, timeout=10)
+            return resp.status_code == 200
+        except Exception as e:
+            logger.error(f"Failed to hide comment: {e}")
+            return False
+
+    def get_post_comments(self, post_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Retrieves comments for a specific post.
+        Returns list of dicts: [{"id": ..., "from": {"name": ..., "id": ...}, "message": ..., "created_time": ...}]
+        """
+        if self.is_mock:
+            # Deterministic simulation comments for testing
+            mock_comments = [
+                {
+                    "id": f"comm_{post_id}_1",
+                    "post_id": post_id,
+                    "from": {"name": "សុខា ភ្នំពេញ", "id": "user_101"},
+                    "message": "តម្លៃប៉ុន្មានដែរមួយបង? មានបញ្ចុះតម្លៃអត់?",
+                    "created_time": time.strftime("%Y-%m-%dT%H:%M:%S+0000"),
+                    "can_reply_privately": True
+                },
+                {
+                    "id": f"comm_{post_id}_2",
+                    "post_id": post_id,
+                    "from": {"name": "ចាន់ថា កំពង់ចាម", "id": "user_102"},
+                    "message": "ចង់ទិញមួយបង សុំលេខកុង ABA មកខ្ញុំវេរលុយភ្លាមៗ!",
+                    "created_time": time.strftime("%Y-%m-%dT%H:%M:%S+0000"),
+                    "can_reply_privately": True
+                },
+                {
+                    "id": f"comm_{post_id}_3",
+                    "post_id": post_id,
+                    "from": {"name": "រតនា សៀមរាប", "id": "user_103"},
+                    "message": "ដឹកដល់សៀមរាបអត់បង? សេវាដឹកប៉ុន្មានថ្ងៃបាន?",
+                    "created_time": time.strftime("%Y-%m-%dT%H:%M:%S+0000"),
+                    "can_reply_privately": True
+                },
+                {
+                    "id": f"comm_{post_id}_4",
+                    "post_id": post_id,
+                    "from": {"name": "Bot Scam 99", "id": "user_spammer"},
+                    "message": "Free crypto giveaway join t.me/freebitcoin fast money!",
+                    "created_time": time.strftime("%Y-%m-%dT%H:%M:%S+0000"),
+                    "can_reply_privately": False
+                },
+                {
+                    "id": f"comm_{post_id}_5",
+                    "post_id": post_id,
+                    "from": {"name": "សុភ័ក្រ ស្រី", "id": "user_105"},
+                    "message": "ស្អាតណាស់បង សេវាកម្មល្អ អរគុណច្រើន ❤️",
+                    "created_time": time.strftime("%Y-%m-%dT%H:%M:%S+0000"),
+                    "can_reply_privately": True
+                }
+            ]
+            return mock_comments[:limit]
+
+        url = f"{self.GRAPH_URL}/{self.api_version}/{post_id}/comments"
+        params = {
+            "fields": "id,from,message,created_time,can_reply_privately",
+            "limit": limit,
+            "access_token": self.access_token
+        }
+        try:
+            resp = requests.get(url, params=params, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json().get("data", [])
+                for d in data:
+                    d["post_id"] = post_id
+                return data
+            logger.error(f"Failed to fetch post comments: {resp.text}")
+            return []
+        except Exception as e:
+            logger.error(f"Error fetching comments for post {post_id}: {e}")
+            return []
+
+    def get_recent_page_comments(self, limit_posts: int = 5, limit_comments_per_post: int = 20) -> List[Dict[str, Any]]:
+        """Scans recent posts on page and aggregates comments."""
+        posts = self.get_page_posts(limit=limit_posts)
+        all_comments = []
+        for p in posts:
+            comments = self.get_post_comments(p.post_id, limit=limit_comments_per_post)
+            all_comments.extend(comments)
+        return all_comments
+
+    def send_page_message(self, recipient_psid: str, message_text: str, quick_replies: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
+        """
+        Sends direct message to a user on Facebook Messenger (Page Messaging API).
+        Supports text and Quick Reply buttons.
+        """
+        if self.is_mock:
+            logger.info(f"[SIMULATION] Sent Page Messenger Message to {recipient_psid}: {message_text[:50]}...")
+            return {"recipient_id": recipient_psid, "message_id": f"mid_sim_{int(time.time()*1000)}"}
+
+        url = f"{self.GRAPH_URL}/{self.api_version}/{self.page_id}/messages"
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json"
+        }
+        msg_payload: Dict[str, Any] = {"text": message_text}
+        if quick_replies:
+            qr_list = []
+            for qr in quick_replies:
+                qr_list.append({
+                    "content_type": "text",
+                    "title": qr.get("title", "")[:20],
+                    "payload": qr.get("payload", "QR_ACTION")
+                })
+            msg_payload["quick_replies"] = qr_list
+
+        body = {
+            "messaging_type": "RESPONSE",
+            "recipient": {"id": recipient_psid},
+            "message": msg_payload
+        }
+        try:
+            resp = requests.post(url, json=body, headers=headers, timeout=10)
+            if resp.status_code == 200:
+                return resp.json()
+            logger.error(f"Messenger send failed: {resp.text}")
+            return {"error": resp.text}
+        except Exception as e:
+            logger.error(f"Exception sending Messenger message: {e}")
+            return {"error": str(e)}
+

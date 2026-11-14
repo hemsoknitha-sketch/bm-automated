@@ -18,11 +18,20 @@ import logging
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field, asdict
 
-from .meta_graph_api import MetaGraphAPIClient, FacebookPost, BoostedAdResult
-from .viral_spike_detector import ViralSpikeDetector, PostEngagementVelocity
-from .ai_copy_hook_scorer import AICopyHookScorer, HookAnalysisResult
-from .ad_performance_predictor import AdPerformancePredictor, PredictionResult
-from .smart_budget_bandit import SmartBudgetBandit, BanditAction
+try:
+    from .meta_graph_api import MetaGraphAPIClient, FacebookPost, BoostedAdResult
+    from .viral_spike_detector import ViralSpikeDetector, PostEngagementVelocity
+    from .ai_copy_hook_scorer import AICopyHookScorer, HookAnalysisResult
+    from .ad_performance_predictor import AdPerformancePredictor, PredictionResult
+    from .smart_budget_bandit import SmartBudgetBandit, BanditAction
+    from .fb_confluence_matrix import FBPostBoostConfluenceMatrix, get_post_boost_confluence_matrix
+except (ImportError, ValueError):
+    from meta_graph_api import MetaGraphAPIClient, FacebookPost, BoostedAdResult
+    from viral_spike_detector import ViralSpikeDetector, PostEngagementVelocity
+    from ai_copy_hook_scorer import AICopyHookScorer, HookAnalysisResult
+    from ad_performance_predictor import AdPerformancePredictor, PredictionResult
+    from smart_budget_bandit import SmartBudgetBandit, BanditAction
+    from fb_confluence_matrix import FBPostBoostConfluenceMatrix, get_post_boost_confluence_matrix
 
 logger = logging.getLogger("BM_AUTOMATED.Orchestrator")
 
@@ -37,6 +46,7 @@ class PostEvaluationRecord:
     prediction: PredictionResult
     action_taken: str  # "BOOSTED", "REJECTED_LOW_VIRALITY", "REJECTED_LOW_ROAS", "REJECTED_POLICY_VIOLATION", "ALREADY_ACTIVE"
     boost_result: Optional[BoostedAdResult] = None
+    confluence_analysis: Optional[Dict[str, Any]] = None
     timestamp: float = field(default_factory=time.time)
 
 
@@ -69,6 +79,7 @@ class AutoBoostOrchestrator:
         self.viral_detector = ViralSpikeDetector(min_viral_threshold=min_viral_score)
         self.copy_scorer = AICopyHookScorer()
         self.predictor = AdPerformancePredictor()
+        self.confluence_matrix = get_post_boost_confluence_matrix()
         self.bandit = SmartBudgetBandit(
             test_budget_usd=test_daily_budget_usd,
             max_budget_usd=max_daily_budget_usd,
@@ -127,6 +138,20 @@ class AutoBoostOrchestrator:
         )
         p_res = self.predictor.predict(features)
 
+        # Step 4.1: 10-Group Quantitative Confluence Matrix Evaluation
+        eng_snapshot = [
+            {"likes": post.likes * 0.4, "comments": post.comments * 0.4, "shares": post.shares * 0.4, "views": post.reach * 0.4},
+            {"likes": post.likes * 0.7, "comments": post.comments * 0.7, "shares": post.shares * 0.7, "views": post.reach * 0.7},
+            {"likes": float(post.likes), "comments": float(post.comments), "shares": float(post.shares), "views": float(post.reach)},
+        ]
+        confluence_res = self.confluence_matrix.compute_boost_confluence(
+            engagement_history=eng_snapshot,
+            caption_hook_score=c_res.hook_power_score,
+            predicted_roas=p_res.predicted_roas,
+            post_type=post.post_type,
+            policy_pass=c_res.policy_compliance_pass
+        )
+
         # Step 5: Decision Gatekeeper
         action_taken = "REJECTED"
         boost_res = None
@@ -150,15 +175,20 @@ class AutoBoostOrchestrator:
         else:
             # QUALIFIED FOR AUTONOMOUS BOOST!
             campaign_name = f"AutoBoost_{post.post_type.upper()}_{post.post_id[-6:]}"
+            # Golden ratio budget expansion for super winners
+            target_budget = self.test_daily_budget_usd
+            if confluence_res.get("decision") == "STRONG_BOOST" and confluence_res.get("budget_multiplier", 1.0) > 1.0:
+                target_budget = min(self.max_daily_budget_usd, round(self.test_daily_budget_usd * confluence_res["budget_multiplier"], 2))
+
             try:
                 boost_res = self.api_client.create_boost_campaign(
                     post_id=post.post_id,
                     campaign_name=campaign_name,
-                    daily_budget_usd=self.test_daily_budget_usd
+                    daily_budget_usd=target_budget
                 )
                 self.active_boosts[post.post_id] = boost_res
                 action_taken = "BOOSTED"
-                logger.info(f"🚀 [AUTO-BOOST SUCCESS] Post {post.post_id} boosted with ${self.test_daily_budget_usd}/day! Pred ROAS: {p_res.predicted_roas}x")
+                logger.info(f"🚀 [AUTO-BOOST SUCCESS] Post {post.post_id} boosted with ${target_budget}/day! Score: {confluence_res.get('boost_score')}, Pred ROAS: {p_res.predicted_roas}x")
             except Exception as e:
                 action_taken = f"ERROR_LAUNCHING_{e}"
                 logger.error(f"Failed to place boost for {post.post_id}: {e}")
@@ -171,7 +201,8 @@ class AutoBoostOrchestrator:
             copy_analysis=c_res,
             prediction=p_res,
             action_taken=action_taken,
-            boost_result=boost_res
+            boost_result=boost_res,
+            confluence_analysis=confluence_res
         )
         self.evaluation_history.append(record)
         return record

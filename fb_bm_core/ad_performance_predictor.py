@@ -64,7 +64,7 @@ class AdPerformancePredictor:
     ]
 
     def __init__(self, models_dir: Optional[Path] = None):
-        self.models_dir = models_dir or (Path(__file__).resolve().parent.parent / "models")
+        self.models_dir = models_dir or (Path(__file__).resolve().parent / "models")
         self.roas_model = None
         self.ctr_model = None
         self._load_models()

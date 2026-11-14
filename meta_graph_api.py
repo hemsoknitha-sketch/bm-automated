@@ -676,3 +676,122 @@ class MetaGraphAPIClient:
             logger.error(f"Failed to hide comment: {e}")
             return False
 
+    def get_post_comments(self, post_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Retrieves comments for a specific post.
+        Returns list of dicts: [{"id": ..., "from": {"name": ..., "id": ...}, "message": ..., "created_time": ...}]
+        """
+        if self.is_mock:
+            # Deterministic simulation comments for testing
+            mock_comments = [
+                {
+                    "id": f"comm_{post_id}_1",
+                    "post_id": post_id,
+                    "from": {"name": "សុខា ភ្នំពេញ", "id": "user_101"},
+                    "message": "តម្លៃប៉ុន្មានដែរមួយបង? មានបញ្ចុះតម្លៃអត់?",
+                    "created_time": time.strftime("%Y-%m-%dT%H:%M:%S+0000"),
+                    "can_reply_privately": True
+                },
+                {
+                    "id": f"comm_{post_id}_2",
+                    "post_id": post_id,
+                    "from": {"name": "ចាន់ថា កំពង់ចាម", "id": "user_102"},
+                    "message": "ចង់ទិញមួយបង សុំលេខកុង ABA មកខ្ញុំវេរលុយភ្លាមៗ!",
+                    "created_time": time.strftime("%Y-%m-%dT%H:%M:%S+0000"),
+                    "can_reply_privately": True
+                },
+                {
+                    "id": f"comm_{post_id}_3",
+                    "post_id": post_id,
+                    "from": {"name": "រតនា សៀមរាប", "id": "user_103"},
+                    "message": "ដឹកដល់សៀមរាបអត់បង? សេវាដឹកប៉ុន្មានថ្ងៃបាន?",
+                    "created_time": time.strftime("%Y-%m-%dT%H:%M:%S+0000"),
+                    "can_reply_privately": True
+                },
+                {
+                    "id": f"comm_{post_id}_4",
+                    "post_id": post_id,
+                    "from": {"name": "Bot Scam 99", "id": "user_spammer"},
+                    "message": "Free crypto giveaway join t.me/freebitcoin fast money!",
+                    "created_time": time.strftime("%Y-%m-%dT%H:%M:%S+0000"),
+                    "can_reply_privately": False
+                },
+                {
+                    "id": f"comm_{post_id}_5",
+                    "post_id": post_id,
+                    "from": {"name": "សុភ័ក្រ ស្រី", "id": "user_105"},
+                    "message": "ស្អាតណាស់បង សេវាកម្មល្អ អរគុណច្រើន ❤️",
+                    "created_time": time.strftime("%Y-%m-%dT%H:%M:%S+0000"),
+                    "can_reply_privately": True
+                }
+            ]
+            return mock_comments[:limit]
+
+        url = f"{self.GRAPH_URL}/{self.api_version}/{post_id}/comments"
+        params = {
+            "fields": "id,from,message,created_time,can_reply_privately",
+            "limit": limit,
+            "access_token": self.access_token
+        }
+        try:
+            resp = requests.get(url, params=params, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json().get("data", [])
+                for d in data:
+                    d["post_id"] = post_id
+                return data
+            logger.error(f"Failed to fetch post comments: {resp.text}")
+            return []
+        except Exception as e:
+            logger.error(f"Error fetching comments for post {post_id}: {e}")
+            return []
+
+    def get_recent_page_comments(self, limit_posts: int = 5, limit_comments_per_post: int = 20) -> List[Dict[str, Any]]:
+        """Scans recent posts on page and aggregates comments."""
+        posts = self.get_page_posts(limit=limit_posts)
+        all_comments = []
+        for p in posts:
+            comments = self.get_post_comments(p.post_id, limit=limit_comments_per_post)
+            all_comments.extend(comments)
+        return all_comments
+
+    def send_page_message(self, recipient_psid: str, message_text: str, quick_replies: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
+        """
+        Sends direct message to a user on Facebook Messenger (Page Messaging API).
+        Supports text and Quick Reply buttons.
+        """
+        if self.is_mock:
+            logger.info(f"[SIMULATION] Sent Page Messenger Message to {recipient_psid}: {message_text[:50]}...")
+            return {"recipient_id": recipient_psid, "message_id": f"mid_sim_{int(time.time()*1000)}"}
+
+        url = f"{self.GRAPH_URL}/{self.api_version}/{self.page_id}/messages"
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json"
+        }
+        msg_payload: Dict[str, Any] = {"text": message_text}
+        if quick_replies:
+            qr_list = []
+            for qr in quick_replies:
+                qr_list.append({
+                    "content_type": "text",
+                    "title": qr.get("title", "")[:20],
+                    "payload": qr.get("payload", "QR_ACTION")
+                })
+            msg_payload["quick_replies"] = qr_list
+
+        body = {
+            "messaging_type": "RESPONSE",
+            "recipient": {"id": recipient_psid},
+            "message": msg_payload
+        }
+        try:
+            resp = requests.post(url, json=body, headers=headers, timeout=10)
+            if resp.status_code == 200:
+                return resp.json()
+            logger.error(f"Messenger send failed: {resp.text}")
+            return {"error": resp.text}
+        except Exception as e:
+            logger.error(f"Exception sending Messenger message: {e}")
+            return {"error": str(e)}
+

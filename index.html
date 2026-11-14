@@ -671,6 +671,117 @@
         </div>
       </div>
     </div>
+
+    <!-- Section: 24/7 AI CHAT & COMMENT AUTO-RESPONDER CLOSER -->
+    <div class="section-card" style="border: 1px solid rgba(24, 119, 242, 0.4); box-shadow: 0 0 20px rgba(24, 119, 242, 0.08);">
+      <div class="section-header">
+        <div>
+          <h2>🤖 24/7 AI CHAT CLOSER & COMMENT PATROL (<span style="color: var(--accent);">5-Point Harmonic Closer</span>)</h2>
+          <span style="font-size: 12px; color: var(--text-muted);">
+            Scans incoming comments, classifies buyer intents, deploys public replies, hides spam, and converts leads via Private Messenger DMs with ABA banking details.
+          </span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary" onclick="toggleChatConfigModal()">⚙️ Business Closing Settings</button>
+          <button id="btn-comment-patrol" class="btn" onclick="triggerCommentPatrol()">
+            <span>⚡ Patrol Comments Now</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Chat Closer Grid -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+        <!-- Left: Live Comments Stream Table -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="font-size: 14px; font-weight: 700; color: #fff;">💬 Intercepted Comments & Leads</h3>
+            <span id="comment-patrol-status" style="font-size: 11px; color: var(--text-muted);">Loading recent actions...</span>
+          </div>
+          <div class="table-container" style="max-height: 380px; overflow-y: auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>User & Comment</th>
+                  <th>Intent</th>
+                  <th>Lead Score</th>
+                  <th>Action Taken</th>
+                </tr>
+              </thead>
+              <tbody id="comments-table-body">
+                <tr><td colspan="4" style="text-align:center; padding: 20px; color: var(--text-muted);">No comments processed yet. Click "Patrol Comments Now".</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Right: Interactive AI Chat Closer Sandbox -->
+        <div>
+          <h3 style="font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 10px;">🧪 Test AI Chatbot (Khmer / English)</h3>
+          <div style="background: #0d121f; border: 1px solid var(--card-border); border-radius: 12px; padding: 16px;">
+            <div class="form-group">
+              <label>Simulate Customer Message:</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="chat-sim-input" placeholder="e.g. តម្លៃប៉ុន្មានបង? ចង់បានមួយ ឬ សុំលេខកុង ABA មក" value="សុំលេខកុង ABA មកបង ខ្ញុំវេរលុយយកមួយ">
+                <button class="btn" style="white-space: nowrap;" onclick="testChatbot()">
+                  <span>Send Test 🚀</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Pre-made test prompts -->
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px;">
+              <button class="btn btn-secondary" style="font-size: 10px; padding: 3px 8px;" onclick="setChatPrompt('សុំលេខកុង ABA មកបង ខ្ញុំវេរលុយយកមួយ')">💳 ABA Inquiry</button>
+              <button class="btn btn-secondary" style="font-size: 10px; padding: 3px 8px;" onclick="setChatPrompt('តម្លៃប៉ុន្មានដែរមួយបង? មានបញ្ចុះតម្លៃអត់?')">💰 Price & Promo</button>
+              <button class="btn btn-secondary" style="font-size: 10px; padding: 3px 8px;" onclick="setChatPrompt('ដឹកដល់សៀមរាបអត់បង? សេវាដឹកប៉ុន្មាន?')">🚚 Delivery Query</button>
+              <button class="btn btn-secondary" style="font-size: 10px; padding: 3px 8px;" onclick="setChatPrompt('ស្អាតណាស់បង សេវាកម្មល្អ អរគុណច្រើន')">❤️ Praise</button>
+              <button class="btn btn-secondary" style="font-size: 10px; padding: 3px 8px;" onclick="setChatPrompt('Free crypto giveaway join t.me/freebitcoin')">🛡️ Spam Test</button>
+            </div>
+
+            <!-- Bot Response Display -->
+            <div id="chat-sim-output-box" style="display: none; background: #111726; border: 1px solid var(--card-border); border-radius: 8px; padding: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span id="chat-sim-intent" class="tag tag-viral">INTENT</span>
+                <span id="chat-sim-score" class="tag tag-traction">Score: 85/100</span>
+                <span id="chat-sim-stage" class="tag tag-boosted">Stage</span>
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">AI CLOSER AUTOMATED RESPONSE:</div>
+              <pre id="chat-sim-reply" style="white-space: pre-wrap; font-family: inherit; font-size: 12px; line-height: 1.5; color: #e2e8f0; background: #0b0f19; padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Business Profile Settings Modal / Panel (Hidden by default) -->
+      <div id="chat-config-panel" style="display: none; margin-top: 18px; background: #0b0f19; border: 1px solid rgba(24, 119, 242, 0.3); border-radius: 12px; padding: 20px;">
+        <h3 style="font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 12px;">⚙️ Business Quick-Close Settings (Customized per Page)</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>Business / Page Name:</label>
+            <input type="text" id="cfg-page-name" placeholder="e.g. Angkor Quant Store">
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>ABA Account Number & Name:</label>
+            <input type="text" id="cfg-aba-account" placeholder="e.g. 000 888 999 (HEM SINATH)">
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>Contact Phone / Hotline:</label>
+            <input type="text" id="cfg-phone" placeholder="e.g. 012 345 678 / 098 765 432">
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>Delivery Policy & Shipping Rates:</label>
+            <input type="text" id="cfg-delivery" placeholder="e.g. Free delivery ភ្នំពេញ | ខេត្ត $1.50">
+          </div>
+          <div class="form-group" style="grid-column: span 2; margin-bottom: 0;">
+            <label>Special Promotion & Guarantee Text:</label>
+            <input type="text" id="cfg-promo" placeholder="e.g. បញ្ចុះតម្លៃពិសេស 20% + ធានាគុណភាព 100% រយៈពេល ៣០ ថ្ងៃ!">
+          </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px;">
+          <button class="btn btn-secondary" onclick="toggleChatConfigModal()">Cancel</button>
+          <button class="btn" onclick="saveChatConfig()">💾 Save Business Profile</button>
+        </div>
+      </div>
+    </div>
   </main>
 
   <footer>
@@ -1102,10 +1213,149 @@
       alert("Caption copied to clipboard!");
     }
 
+    // =========================================================================
+    // AI CHAT & COMMENT PATROL CLOSER JAVASCRIPT
+    // =========================================================================
+
+    async function loadRecentComments() {
+      try {
+        const res = await fetch('/api/comments/recent');
+        const data = await res.json();
+        const tbody = document.getElementById('comments-table-body');
+        const statusSpan = document.getElementById('comment-patrol-status');
+        
+        statusSpan.textContent = `Total Intercepted: ${data.total_processed}`;
+        
+        if (!data.actions || data.actions.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px; color: var(--text-muted);">No comments processed yet. Click "Patrol Comments Now".</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = '';
+        data.actions.forEach(a => {
+          const tr = document.createElement('tr');
+          const intentBadge = a.intent === 'SPAM_OR_SCAM' ? 'tag-normal' : (a.intent === 'HOW_TO_ORDER' ? 'tag-viral' : 'tag-traction');
+          const actionText = a.is_hidden_spam ? '<span style="color:var(--danger)">🛡️ Auto-Hidden Spam</span>' : (a.private_dm_sent ? '<span style="color:var(--success)">💬 Replied + Private DM</span>' : '💬 Replied Publicly');
+          
+          tr.innerHTML = `
+            <td>
+              <div style="font-weight: 600; color: #fff;">${a.user_name}</div>
+              <div style="font-size: 11px; color: var(--text-muted);">${a.message}</div>
+            </td>
+            <td><span class="tag ${intentBadge}">${a.intent}</span></td>
+            <td><span class="tag tag-boosted">${a.lead_score}/100</span></td>
+            <td style="font-size: 11px;">${actionText}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function triggerCommentPatrol() {
+      const btn = document.getElementById('btn-comment-patrol');
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳ Patrol Scanning...</span>';
+      try {
+        const res = await fetch('/api/comments/scan', { method: 'POST' });
+        const data = await res.json();
+        alert(data.message || 'Comment patrol completed!');
+        await loadRecentComments();
+      } catch (e) {
+        alert('Patrol failed: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>⚡ Patrol Comments Now</span>';
+      }
+    }
+
+    function setChatPrompt(prompt) {
+      document.getElementById('chat-sim-input').value = prompt;
+      testChatbot();
+    }
+
+    async function testChatbot() {
+      const msg = document.getElementById('chat-sim-input').value.trim();
+      if (!msg) return;
+
+      const box = document.getElementById('chat-sim-output-box');
+      const intentSpan = document.getElementById('chat-sim-intent');
+      const scoreSpan = document.getElementById('chat-sim-score');
+      const stageSpan = document.getElementById('chat-sim-stage');
+      const replyPre = document.getElementById('chat-sim-reply');
+
+      replyPre.textContent = '⏳ AI Closer analyzing buyer journey...';
+      box.style.display = 'block';
+
+      try {
+        const res = await fetch('/api/chat/simulate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg, sender_name: 'អតិថិជន' })
+        });
+        const data = await res.json();
+
+        intentSpan.textContent = data.intent;
+        scoreSpan.textContent = `Score: ${data.lead_score}/100`;
+        stageSpan.textContent = data.stage;
+        replyPre.textContent = data.reply_text;
+      } catch (e) {
+        replyPre.textContent = 'Error: ' + e.message;
+      }
+    }
+
+    function toggleChatConfigModal() {
+      const panel = document.getElementById('chat-config-panel');
+      panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    }
+
+    async function loadChatConfig() {
+      try {
+        const res = await fetch('/api/chat/config');
+        const data = await res.json();
+        if (data) {
+          document.getElementById('cfg-page-name').value = data.page_name || '';
+          document.getElementById('cfg-aba-account').value = data.aba_account || '';
+          document.getElementById('cfg-phone').value = data.phone || '';
+          document.getElementById('cfg-delivery').value = data.delivery_info || '';
+          document.getElementById('cfg-promo').value = data.promo_text || '';
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function saveChatConfig() {
+      const payload = {
+        page_name: document.getElementById('cfg-page-name').value,
+        aba_account: document.getElementById('cfg-aba-account').value,
+        phone: document.getElementById('cfg-phone').value,
+        delivery_info: document.getElementById('cfg-delivery').value,
+        promo_text: document.getElementById('cfg-promo').value
+      };
+      try {
+        const res = await fetch('/api/chat/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('✅ Business Profile Saved Successfully!');
+          toggleChatConfigModal();
+        }
+      } catch (e) {
+        alert('Failed to save profile: ' + e.message);
+      }
+    }
+
     // Initialize
     loadStatus();
     loadPosts();
     loadUsersAndPages();
+    loadRecentComments();
+    loadChatConfig();
   </script>
 </body>
 </html>

@@ -24,17 +24,19 @@ sys.path.insert(0, str(BASE_DIR))
 from config import config
 
 try:
-    from fb_bm_core.meta_graph_api import MetaGraphAPIClient, FacebookPost
-    from fb_bm_core.auto_boost_orchestrator import AutoBoostOrchestrator
-    from fb_bm_core.ai_copy_hook_scorer import AICopyHookScorer
-    from fb_bm_core.ad_performance_predictor import AdPerformancePredictor
-    from fb_bm_core.viral_spike_detector import ViralSpikeDetector
-except ImportError:
     from meta_graph_api import MetaGraphAPIClient, FacebookPost
     from auto_boost_orchestrator import AutoBoostOrchestrator
     from ai_copy_hook_scorer import AICopyHookScorer
     from ad_performance_predictor import AdPerformancePredictor
     from viral_spike_detector import ViralSpikeDetector
+    from auto_comment_responder import AutoCommentResponder
+except ImportError:
+    from fb_bm_core.meta_graph_api import MetaGraphAPIClient, FacebookPost
+    from fb_bm_core.auto_boost_orchestrator import AutoBoostOrchestrator
+    from fb_bm_core.ai_copy_hook_scorer import AICopyHookScorer
+    from fb_bm_core.ad_performance_predictor import AdPerformancePredictor
+    from fb_bm_core.viral_spike_detector import ViralSpikeDetector
+    from fb_bm_core.auto_comment_responder import AutoCommentResponder
 
 from fb_multi_tenant_manager import MultiTenantManager
 from fb_auth_gateway import FBAuthGateway
@@ -65,6 +67,8 @@ orchestrator = AutoBoostOrchestrator(
     max_active_boosts=config.policy.max_active_boosts,
     stop_loss_roas=config.policy.stop_loss_roas
 )
+
+comment_responder = AutoCommentResponder(api_client=api_client)
 
 
 @app.route("/")
@@ -645,6 +649,139 @@ def api_publish_offline_boost():
     p_name = active_rec.page_name if active_rec else client.page_id
     res["page_name"] = p_name
     return jsonify(res)
+
+
+# ==============================================================================
+# AI CHAT & COMMENT AUTO-RESPONDER API ENDPOINTS
+# ==============================================================================
+
+@app.route("/api/comments/recent", methods=["GET"])
+def api_get_recent_comments():
+    """Returns recent comments processed by the AI comment auto-responder."""
+    reports = []
+    for r in comment_responder.recent_actions:
+        reports.append({
+            "comment_id": r.comment_id,
+            "post_id": r.post_id,
+            "user_name": r.user_name,
+            "message": r.message,
+            "intent": r.intent,
+            "public_reply": r.public_reply_sent,
+            "private_dm_sent": r.private_dm_sent,
+            "is_hidden_spam": r.is_hidden_spam,
+            "lead_score": r.confluence_analysis.get("lead_score", 50.0) if r.confluence_analysis else 50.0,
+            "stage": r.confluence_analysis.get("stage", "STAGE_ENGAGEMENT") if r.confluence_analysis else "STAGE_ENGAGEMENT",
+            "processed_at": r.processed_at
+        })
+    return jsonify({
+        "total_processed": len(comment_responder.processed_comment_ids),
+        "recent_count": len(reports),
+        "actions": reports
+    })
+
+
+@app.route("/api/comments/scan", methods=["POST"])
+def api_trigger_comment_scan():
+    """Triggers on-demand comment scan across connected page posts."""
+    reports = comment_responder.poll_and_respond_comments(limit_posts=3)
+    return jsonify({
+        "success": True,
+        "scanned_actions_count": len(reports),
+        "message": f"Successfully evaluated and responded to {len(reports)} comments."
+    })
+
+
+@app.route("/api/chat/simulate", methods=["POST"])
+def api_chat_simulate():
+    """Interactive sandbox to test customer inquiries with NLP intent & harmonic closing response."""
+    data = request.get_json() or {}
+    message = data.get("message", "").strip()
+    sender_name = data.get("sender_name", "អតិថិជន")
+
+    if not message:
+        return jsonify({"error": "Message text is required."}), 400
+
+    result = comment_responder.handle_incoming_messenger_message(
+        sender_psid="sandbox_user_sim",
+        sender_name=sender_name,
+        message_text=message
+    )
+    return jsonify(result)
+
+
+@app.route("/api/chat/config", methods=["GET", "POST"])
+def api_chat_config():
+    """Gets or updates live business profile and quick close templates."""
+    if request.method == "POST":
+        data = request.get_json() or {}
+        comment_responder.update_business_profile(data)
+        return jsonify({
+            "success": True,
+            "profile": comment_responder.business_profile
+        })
+    return jsonify(comment_responder.business_profile)
+
+
+@app.route("/fb_webhook", methods=["GET", "POST"])
+def fb_webhook_gateway():
+    """
+    Official Meta Webhook Gateway for Facebook Messenger & Page Feed comments.
+    GET: Challenge verification handshake (hub.verify_token & hub.challenge).
+    POST: Real-time event receiver & immediate AI closer response.
+    """
+    verify_token = os.getenv("META_WEBHOOK_VERIFY_TOKEN", "angkor_quant_bm_secret")
+
+    if request.method == "GET":
+        mode = request.args.get("hub.mode")
+        token = request.args.get("hub.verify_token")
+        challenge = request.args.get("hub.challenge")
+        if mode == "subscribe" and token == verify_token:
+            logger.info("✅ [META WEBHOOK] Verified webhook handshake challenge from Meta successfully!")
+            return challenge, 200
+        logger.warning("❌ [META WEBHOOK] Failed challenge verification. Invalid verify_token.")
+        return "Verification token mismatch", 403
+
+    # POST payload handler
+    payload = request.get_json(silent=True) or {}
+    logger.info(f"📨 [META WEBHOOK EVENT RECEIVED]: {str(payload)[:160]}...")
+
+    entries = payload.get("entry", [])
+    for entry in entries:
+        # 1. Messenger incoming messages
+        messaging_events = entry.get("messaging", [])
+        for event in messaging_events:
+            sender_id = event.get("sender", {}).get("id")
+            message = event.get("message", {})
+            msg_text = message.get("text")
+            if sender_id and msg_text:
+                logger.info(f"💬 [WEBHOOK MESSENGER] Message from PSID {sender_id}: {msg_text}")
+                comment_responder.handle_incoming_messenger_message(
+                    sender_psid=sender_id,
+                    sender_name="អតិថិជន",
+                    message_text=msg_text
+                )
+
+        # 2. Feed comment events
+        changes = entry.get("changes", [])
+        for ch in changes:
+            val = ch.get("value", {})
+            item_type = val.get("item")
+            verb = val.get("verb")
+            if item_type == "comment" and verb == "add":
+                c_id = val.get("comment_id")
+                post_id = val.get("post_id")
+                sender_name = val.get("from", {}).get("name", "អតិថិជន")
+                comment_msg = val.get("message", "")
+                if c_id and comment_msg:
+                    logger.info(f"💬 [WEBHOOK COMMENT] Comment {c_id} on post {post_id}: {comment_msg}")
+                    comment_responder.process_comment(
+                        comment_id=c_id,
+                        post_id=post_id,
+                        user_name=sender_name,
+                        message=comment_msg
+                    )
+
+    return "EVENT_RECEIVED", 200
 
 
 def start_web_server(port: int = 8088, host: str = "0.0.0.0"):

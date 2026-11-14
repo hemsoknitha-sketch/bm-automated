@@ -24,17 +24,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config import config
 
 try:
-    from fb_bm_core.meta_graph_api import MetaGraphAPIClient, FacebookPost
-    from fb_bm_core.auto_boost_orchestrator import AutoBoostOrchestrator
-    from fb_bm_core.ai_copy_hook_scorer import AICopyHookScorer
-    from fb_bm_core.ad_performance_predictor import AdPerformancePredictor
-    from fb_bm_core.viral_spike_detector import ViralSpikeDetector
-except ImportError:
     from meta_graph_api import MetaGraphAPIClient, FacebookPost
     from auto_boost_orchestrator import AutoBoostOrchestrator
     from ai_copy_hook_scorer import AICopyHookScorer
     from ad_performance_predictor import AdPerformancePredictor
     from viral_spike_detector import ViralSpikeDetector
+    from auto_comment_responder import AutoCommentResponder
+except ImportError:
+    from fb_bm_core.meta_graph_api import MetaGraphAPIClient, FacebookPost
+    from fb_bm_core.auto_boost_orchestrator import AutoBoostOrchestrator
+    from fb_bm_core.ai_copy_hook_scorer import AICopyHookScorer
+    from fb_bm_core.ad_performance_predictor import AdPerformancePredictor
+    from fb_bm_core.viral_spike_detector import ViralSpikeDetector
+    from fb_bm_core.auto_comment_responder import AutoCommentResponder
 
 logging.basicConfig(
     level=logging.INFO,
@@ -73,6 +75,9 @@ def run_scan_cycle(orchestrator: AutoBoostOrchestrator):
         for b in summary["bandit_actions"]:
             print(f"   • Ad {b.ad_id} | Action: {b.action_type} | Realized ROAS: {b.realized_roas}X | New Budget: ${b.recommended_budget_usd:.2f}/day")
             print(f"     Reason: {b.reason}")
+
+    # Check incoming page comments and auto-reply
+    check_comment_auto_responder(orchestrator.api_client)
 
     print("=" * 80 + "\n")
 
@@ -118,6 +123,28 @@ def check_autonomous_publishing():
         logger.error(f"Error in autonomous publishing daemon cycle: {e}")
 
 
+def check_comment_auto_responder(client: MetaGraphAPIClient):
+    """
+    Patrols comments on connected Facebook Page posts, executes NLP intent classification,
+    and deploys public replies, spam hiding, and private Messenger DMs.
+    """
+    try:
+        responder = AutoCommentResponder(api_client=client)
+        reports = responder.poll_and_respond_comments(limit_posts=3)
+        if reports:
+            print("\n" + "-" * 80)
+            print(f"🤖 [AI COMMENT & MESSENGER PATROL] Executed {len(reports)} Actions:")
+            for r in reports:
+                status_icon = "🛡️ HIDDEN SPAM" if r.is_hidden_spam else ("💬 REPLIED + DM" if r.private_dm_sent else "💬 REPLIED")
+                print(f"   • {status_icon} | [{r.intent}] User: {r.user_name}")
+                print(f"     Comment: \"{r.message}\"")
+                if r.public_reply_sent:
+                    print(f"     Public:  \"{r.public_reply_sent[:70]}...\"")
+            print("-" * 80)
+    except Exception as e:
+        logger.error(f"Error during comment auto-responder patrol: {e}")
+
+
 def run_daemon(orchestrator: AutoBoostOrchestrator, interval_seconds: int = 300):
     """Runs continuous background automation loop."""
     print("=" * 80)
@@ -129,6 +156,7 @@ def run_daemon(orchestrator: AutoBoostOrchestrator, interval_seconds: int = 300)
         while True:
             run_scan_cycle(orchestrator)
             check_autonomous_publishing()
+            check_comment_auto_responder(orchestrator.api_client)
             print(f"⏳ Sleeping for {interval_seconds}s until next scan... (Press Ctrl+C to stop)")
             time.sleep(interval_seconds)
     except KeyboardInterrupt:

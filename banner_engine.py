@@ -66,8 +66,50 @@ class BannerEngine:
         if prompt and not re.search(r'[\u1780-\u17ff]', prompt):
             return prompt
 
-        # 2. Topic keyword mapping based on Khmer news content
-        # Diplomacy, Bilateral Trade, International Affairs & Government Summit
+        # 2. Topic keyword mapping based on Commercial & Business Products
+        text_lower = text.lower()
+
+        # E-Commerce, Digital Marketing, Boost & Online Business
+        if any(k in text_lower for k in ["លក់អនឡាញ", "boost", "marketing", "ecommerce", "facebook", "ads", "ចំណេញ", "អាជីវកម្ម", "លុយ", "business", "sales", "viral"]):
+            return "High-tech digital marketing growth dashboard, futuristic 3D golden rocket soaring through rising neon financial charts, cyber ecommerce success, commercial advertising 4k"
+
+        # Shoes, Footwear & Sneakers
+        if any(k in text_lower for k in ["ស្បែកជើង", "កែង", "ប៉ាតា", "shoes", "sneakers", "heels", "footwear", "boots"]):
+            return "Luxury designer shoes and stylish sneakers on elegant minimalist podium, soft studio lighting, professional commercial footwear product photography 4k"
+
+        # Bags, Luxury Accessories & Jewelry
+        if any(k in text_lower for k in ["កាបូប", "នាឡិកា", "ចិញ្ចៀន", "គ្រឿងអលង្ការ", "ពេជ្រ", "មាស", "bag", "handbag", "watch", "jewelry", "diamond", "gold"]):
+            return "Luxury leather handbag and premium designer watch on marble pedestal, warm cinematic rim lighting, high-end boutique product showcase 4k"
+
+        # Fashion, Apparel & Clothing
+        if any(k in text_lower for k in ["សម្លៀកបំពាក់", "ខោអាវ", "រ៉ូប", "ម៉ូដ", "អាវ", "ខោ", "fashion", "dress", "clothing", "boutique", "apparel"]):
+            return "Modern trendy fashion apparel showcase, high-end clothing boutique display, vibrant stylish studio lighting, commercial fashion photography 4k"
+
+        # Cosmetics, Skincare & Beauty Care
+        if any(k in text_lower for k in ["គ្រឿងសម្អាង", "ស្បែក", "ឡេ", "សេរ៉ូម", "សាប៊ូ", "មុខ", "cosmetics", "skincare", "beauty", "serum", "makeup", "lotion", "cream"]):
+            return "Premium skincare cosmetic bottles with glass dropper, natural water splash and green botanical leaves, soft pastel glowing aesthetic, luxury cosmetic advertisement 4k"
+
+        # Food, Cafe & Beverages
+        if any(k in text_lower for k in ["ម្ហូប", "អាហារ", "កាហ្វេ", "ភេសជ្ជៈ", "តែ", "បង្អែម", "food", "coffee", "drink", "restaurant", "dessert", "snack", "cafe"]):
+            return "Exquisite gourmet culinary dish and artisanal iced coffee, fresh organic ingredients, warm luxury restaurant ambient lighting, delicious food photography 4k"
+
+        # Real Estate, Architecture & Borey Housing
+        if any(k in text_lower for k in ["ផ្ទះ", "បុរី", "ដី", "ខុនដូ", "វីឡា", "real estate", "property", "villa", "condo", "house", "land", "borey"]):
+            return "Stunning modern luxury architectural villa exterior, sparkling swimming pool, lush landscaped garden, golden sunset sky, high-end real estate photography 4k"
+
+        # Tech, Gadgets, Smartphones & Electronics
+        if any(k in text_lower for k in ["ទូរស័ព្ទ", "កុំព្យូទ័រ", "កាស", "អាយផេត", "tech", "phone", "smartphone", "laptop", "gadget", "electronics"]):
+            return "Futuristic sleek flagship smartphone and wireless gadgets on dark reflective podium, vibrant cyan and purple neon edge lighting, modern tech commercial 4k"
+
+        # Automotive, Cars & Motorbikes
+        if any(k in text_lower for k in ["ឡាន", "រថយន្ត", "ម៉ូតូ", "car", "auto", "vehicle", "motorcycle"]):
+            return "Modern luxury sports car in contemporary showroom, dynamic reflections on glossy metallic paint, automotive commercial photography 4k"
+
+        # Education, Courses & Books
+        if any(k in text_lower for k in ["រៀន", "វគ្គសិក្សា", "សៀវភៅ", "ចំណេះដឹង", "education", "course", "training", "book"]):
+            return "Modern creative digital learning workspace, glowing tablet with inspirational education graphics, warm library study ambiance 4k"
+
+        # 3. National Affairs, Diplomacy & Government Summit
         if any(k in text for k in ["អាមេរិក", "សហរដ្ឋអាមេរិក", "ចិន", "ថៃ", "កម្ពុជា", "កិច្ចប្រជុំ", "កិច្ចព្រមព្រៀង", "ពាណិជ្ជកម្ម", "សេដ្ឋកិច្ច", "ក្រសួងការបរទេស", "រដ្ឋមន្ត្រី", "ប្រធានាធិបតី", "នាយករដ្ឋមន្ត្រី"]):
             if "អាមេរិក" in text or "សហរដ្ឋអាមេរិក" in text:
                 return "Cambodia and USA national flags, official diplomatic bilateral trade meeting, executive conference hall, high resolution digital editorial illustration"
