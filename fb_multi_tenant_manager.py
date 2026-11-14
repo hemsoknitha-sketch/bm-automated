@@ -210,6 +210,20 @@ class MultiTenantManager:
             """)
             return [dict(row) for row in cursor.fetchall()]
 
+    def list_all_pages(self) -> List[Dict[str, Any]]:
+        """Lists all managed Facebook Pages across all VIP users."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT p.page_id, p.telegram_id, p.page_name, p.category, p.followers_count,
+                   p.is_active, p.is_active_boost, p.is_active_chat, p.daily_budget_usd,
+                   p.min_roas_hurdle, p.last_synced, u.fb_name
+            FROM managed_pages p
+            LEFT JOIN users u ON p.telegram_id = u.telegram_id
+            ORDER BY p.last_synced DESC
+            """)
+            return [dict(row) for row in cursor.fetchall()]
+
     def delete_user(self, telegram_id: str) -> bool:
         """Completely purges user and all associated pages (Logout)."""
         t_id = str(telegram_id).strip()

@@ -129,6 +129,8 @@ class BMTelegramBot:
 
         try:
             resp = requests.post(url, json=payload, timeout=10)
+            if resp.status_code != 200:
+                logger.error(f"Telegram sendMessage failed [{resp.status_code}]: {resp.text}")
             return resp.status_code == 200
         except Exception as e:
             logger.error(f"Telegram sendMessage error: {e}")
@@ -208,8 +210,14 @@ class BMTelegramBot:
                 {"text": "🤖 Toggle Autopilot", "callback_data": "cmd_toggle_autopilot"}
             ])
 
+        if self.admin_id and str(chat_id) == str(self.admin_id):
+            buttons.append([
+                {"text": "👑 Super Admin Suite", "callback_data": "cmd_admin_status"},
+                {"text": "📈 System Status", "callback_data": "cmd_status"}
+            ])
+
         buttons.append([
-            {"text": "🌐 Open Web Dashboard", "url": f"http://localhost:{config.web_port}"},
+            {"text": "🌐 Web GUI Dashboard", "callback_data": "cmd_web_dashboard"},
             {"text": "❓ Help & Commands", "callback_data": "cmd_help"}
         ])
 
@@ -431,6 +439,12 @@ class BMTelegramBot:
             self.handle_active(chat_id)
         elif data == "cmd_roas":
             self.handle_roas_scorecard(chat_id)
+        elif data == "cmd_status":
+            self.handle_status(chat_id)
+        elif data == "cmd_admin_status":
+            self.handle_admin_status(chat_id)
+        elif data == "cmd_web_dashboard":
+            self.handle_web_dashboard_info(chat_id)
         elif data == "cmd_toggle_autopilot":
             self.autopilot_enabled = not self.autopilot_enabled
             state = "🟢 ACTIVE" if self.autopilot_enabled else "🔴 PAUSED"
@@ -881,6 +895,265 @@ class BMTelegramBot:
         )
         self.send_message(chat_id, help_text)
 
+    def handle_web_dashboard_info(self, chat_id: str):
+        """Displays Web GUI access URL and instructions."""
+        port = config.web_port
+        msg = (
+            "🌐 <b>FB PAGE BM AUTOMATED - WEB GUI DASHBOARD</b>\n"
+            "────────────────────────────\n"
+            f"• <b>Web Port:</b> <code>{port}</code>\n"
+            f"• <b>Localhost Access:</b> <code>http://localhost:{port}</code>\n"
+            f"• <b>Linux VPS Access:</b> <code>http://&lt;VPS_IP&gt;:{port}</code>\n"
+            "────────────────────────────\n"
+            "💡 <b>របៀបចូលប្រើប្រាស់ Web Dashboard៖</b>\n"
+            "1. <b>បើដំណើរការលើកុំព្យូទ័រផ្ទាល់៖</b> បើក Browser ហើយចូលទៅ <code>http://localhost:8088</code>\n"
+            "2. <b>បើដំណើរការលើ Google Cloud VPS៖</b> បើក Browser លើទូរស័ព្ទដៃ ឬកុំព្យូទ័រ "
+            "ហើយចូលតាម External IP របស់ VPS ឧទាហរណ៍៖ <code>http://34.x.x.x:8088</code>\n"
+            "<i>(ចំណាំ៖ ត្រូវប្រាកដថា Firewall Rule លើ Google Cloud Console បានបើកអនុញ្ញាត Allow TCP Port 8088)</i>"
+        )
+        self.send_message(chat_id, msg)
+
+    def handle_status(self, chat_id: str):
+        """Displays system health, VPS resources, and bot operational state."""
+        import platform
+
+        mem_info = "Normal"
+        try:
+            import psutil
+            mem = psutil.virtual_memory()
+            mem_info = f"{mem.used // (1024*1024)}MB / {mem.total // (1024*1024)}MB ({mem.percent}%)"
+        except ImportError:
+            try:
+                with open("/proc/meminfo", "r") as f:
+                    lines = f.readlines()
+                    total = int([l for l in lines if "MemTotal" in l][0].split()[1]) // 1024
+                    avail = int([l for l in lines if "MemAvailable" in l][0].split()[1]) // 1024
+                    used = total - avail
+                    mem_info = f"{used}MB / {total}MB ({int(used/total*100)}%)"
+            except Exception:
+                mem_info = "User Space Process Mode"
+
+        users_count = len(self.multi_tenant.list_users())
+        pages_count = len(self.multi_tenant.list_all_pages())
+        active_boosts = len(self.orchestrator.active_boosts)
+        autopilot_state = "🟢 ACTIVE" if self.autopilot_enabled else "🔴 PAUSED"
+        mode_badge = "🛡️ MOCK SIMULATION" if self.api_client.is_mock else "🟢 LIVE META GRAPH API"
+
+        msg = (
+            "📊 <b>FB PAGE BM AUTOMATED - SYSTEM STATUS</b>\n"
+            "────────────────────────────\n"
+            f"• <b>Engine Status:</b> 🟢 <b>ONLINE (24/7 LIVE)</b>\n"
+            f"• <b>Operating System:</b> <code>{platform.system()} {platform.release()}</code>\n"
+            f"• <b>Python Runtime:</b> <code>{platform.python_version()}</code>\n"
+            f"• <b>RAM Footprint:</b> <code>{mem_info}</code>\n"
+            f"• <b>Autopilot Engine:</b> {autopilot_state}\n"
+            f"• <b>Meta API Status:</b> {mode_badge}\n"
+            f"• <b>Registered VIP Users:</b> <code>{users_count}</code>\n"
+            f"• <b>Managed Facebook Pages:</b> <code>{pages_count}</code>\n"
+            f"• <b>Active Boosted Ads:</b> <code>{active_boosts}/{config.policy.max_active_boosts}</code>\n"
+            f"• <b>Web Dashboard Port:</b> <code>{config.web_port}</code>\n"
+            "────────────────────────────\n"
+            "🛡️ <i>ប្រព័ន្ធការពារដើមទុន ១០០% និងដំណើរការរលូន ២៤/៧ លើ Google Cloud VPS!</i>"
+        )
+        self.send_message(chat_id, msg)
+
+    def handle_admin_status(self, chat_id: str):
+        """Displays institutional administrative telemetry for Super Admin."""
+        if self.admin_id and str(chat_id) != str(self.admin_id):
+            self.send_message(chat_id, "⛔ <b>ACCESS DENIED:</b> ពាក្យបញ្ជានេះសម្រាប់តែ Super Admin ប៉ុណ្ណោះ។")
+            return
+
+        users = self.multi_tenant.list_users()
+        pages = self.multi_tenant.list_all_pages()
+        active_boosts = len(self.orchestrator.active_boosts)
+        autopilot_state = "🟢 ACTIVE" if self.autopilot_enabled else "🔴 PAUSED"
+
+        msg = (
+            "👑 <b>SUPER ADMIN INSTITUTIONAL TELEMETRY</b>\n"
+            "────────────────────────────\n"
+            f"• <b>Admin Chat ID:</b> <code>{self.admin_id}</code>\n"
+            f"• <b>GCP VPS Target:</b> <code>bm-automated (us-central1-a)</code>\n"
+            f"• <b>Multi-Tenant DB:</b> <code>{self.multi_tenant.db_path.name}</code>\n"
+            f"• <b>Total VIP Users:</b> <code>{len(users)}</code>\n"
+            f"• <b>Total Connected Pages:</b> <code>{len(pages)}</code>\n"
+            f"• <b>Active Ad Campaigns:</b> <code>{active_boosts}</code>\n"
+            f"• <b>Autopilot Engine:</b> {autopilot_state}\n"
+            f"• <b>Stop Loss ROAS:</b> <code>{config.policy.stop_loss_roas}X</code>\n"
+            f"• <b>Min Viral Hurdle:</b> <code>{config.policy.min_viral_score}/100</code>\n"
+            f"• <b>Test Daily Budget:</b> <code>${config.policy.test_daily_budget_usd:.2f}</code>\n"
+            f"• <b>Max Daily Budget:</b> <code>${config.policy.max_daily_budget_usd:.2f}</code>\n"
+            "────────────────────────────\n"
+            "🛠️ <b>ADMIN MANAGEMENT COMMANDS:</b>\n"
+            "• <code>/admin_users</code>: បង្ហាញបញ្ជី VIP Users ទាំងអស់\n"
+            "• <code>/admin_pages</code>: បង្ហាញបញ្ជី Pages ទាំងអស់ក្នុងប្រព័ន្ធ\n"
+            "• <code>/admin_sync</code>: បង្ខំ Refresh & Verify Pages ទាំងអស់\n"
+            "• <code>/admin_broadcast &lt;សារ&gt;</code>: ផ្ញើសារប្រកាសទៅកាន់ Users ទាំងអស់\n"
+            "• <code>/autopilot [on|off]</code>: បើក/បិទ Autopilot\n"
+            "• <code>/status</code>: មើលសុខភាព Server ទូទៅ"
+        )
+        self.send_message(chat_id, msg)
+
+    def handle_admin_users(self, chat_id: str):
+        """Lists all registered VIP users."""
+        if self.admin_id and str(chat_id) != str(self.admin_id):
+            self.send_message(chat_id, "⛔ <b>ACCESS DENIED</b>")
+            return
+
+        users = self.multi_tenant.list_users()
+        if not users:
+            self.send_message(chat_id, "ℹ️ មិនទាន់មាន VIP User ចុះឈ្មោះក្នុងប្រព័ន្ធនៅឡើយទេ។")
+            return
+
+        msg = f"👥 <b>បញ្ជី VIP USERS ទាំងអស់ ({len(users)} Users):</b>\n────────────────────────────\n"
+        for u in users:
+            name = u.get("fb_name") or "Unknown"
+            t_id = u.get("telegram_id")
+            pg_cnt = u.get("page_count", 0)
+            method = u.get("auth_method", "N/A")
+            msg += (
+                f"• 👤 <b>{name}</b>\n"
+                f"  └ Telegram ID: <code>{t_id}</code>\n"
+                f"  └ Pages: <code>{pg_cnt}</code> | Auth: <code>{method}</code>\n\n"
+            )
+        self.send_message(chat_id, msg)
+
+    def handle_admin_pages(self, chat_id: str):
+        """Lists all managed Facebook Pages across all users."""
+        if self.admin_id and str(chat_id) != str(self.admin_id):
+            self.send_message(chat_id, "⛔ <b>ACCESS DENIED</b>")
+            return
+
+        pages = self.multi_tenant.list_all_pages()
+        if not pages:
+            self.send_message(chat_id, "ℹ️ មិនទាន់មាន Page ក្នុងប្រព័ន្ធនៅឡើយទេ។")
+            return
+
+        msg = f"📑 <b>បញ្ជី FACEBOOK PAGES ទាំងអស់ ({len(pages)} Pages):</b>\n────────────────────────────\n"
+        for p in pages:
+            p_name = p.get("page_name") or "Untitled"
+            p_id = p.get("page_id")
+            fb_user = p.get("fb_name") or "Unknown"
+            boost = "ON 🚀" if p.get("is_active_boost") else "OFF ⏸️"
+            chat = "ON 🤖" if p.get("is_active_chat") else "OFF ⏸️"
+            budget = p.get("daily_budget_usd", 5.0)
+            msg += (
+                f"• 📄 <b>{p_name}</b> (<code>{p_id}</code>)\n"
+                f"  └ Owner: <b>{fb_user}</b> (Telegram: <code>{p.get('telegram_id')}</code>)\n"
+                f"  └ Auto-Boost: {boost} | AI Chat: {chat} | Budget: ${budget:.2f}/day\n\n"
+            )
+        self.send_message(chat_id, msg)
+
+    def handle_admin_sync(self, chat_id: str):
+        """Forces refresh and verification of all connected pages."""
+        if self.admin_id and str(chat_id) != str(self.admin_id):
+            self.send_message(chat_id, "⛔ <b>ACCESS DENIED</b>")
+            return
+
+        self.send_message(chat_id, "🔄 <b>កំពុងធ្វើសមកាលកម្ម (Sync) គណនី និង Pages ទាំងអស់...</b>")
+        pages = self.multi_tenant.list_all_pages()
+        self.send_message(chat_id, f"✅ <b>សមកាលកម្មជោគជ័យ!</b> រកឃើញ <code>{len(pages)}</code> Facebook Pages សកម្ម។")
+
+    def handle_admin_broadcast(self, chat_id: str, text: str):
+        """Broadcasts a high-priority announcement to all registered users."""
+        if self.admin_id and str(chat_id) != str(self.admin_id):
+            self.send_message(chat_id, "⛔ <b>ACCESS DENIED</b>")
+            return
+
+        content = text.replace("/admin_broadcast", "", 1).strip()
+        if not content:
+            self.send_message(chat_id, "⚠️ <b>ទម្រង់ប្រើប្រាស់៖</b> <code>/admin_broadcast &lt;អត្ថបទសារប្រកាស&gt;</code>")
+            return
+
+        users = self.multi_tenant.list_users()
+        sent_count = 0
+        broadcast_msg = f"📢 <b>ANNOUNCEMENT ពី SUPER ADMIN:</b>\n────────────────────────────\n{content}"
+
+        for u in users:
+            t_id = u.get("telegram_id")
+            if t_id and t_id != chat_id:
+                if self.send_message(t_id, broadcast_msg):
+                    sent_count += 1
+
+        self.send_message(chat_id, f"✅ <b>បានផ្ញើសារប្រកាសទៅកាន់ {sent_count}/{len(users)} VIP Users រួចរាល់!</b>")
+
+    def register_bot_commands(self) -> bool:
+        """
+        Registers Dual-Tier Telegram Bot Commands with Telegram API (setMyCommands):
+        Tier 1 (Public VIP Users / Default Scope): Clean, benefit-driven commands.
+        Tier 2 (Super Admin / Chat Scope): Full institutional governance commands.
+        """
+        if not self.is_configured:
+            return False
+
+        vip_commands = [
+            {"command": "start", "description": "🚀 បើកផ្ទាំង Dashboard ចម្បង & Status"},
+            {"command": "offline_boost", "description": "⚡ បង្កើត 4K Viral Package ($0 Ad Spend)"},
+            {"command": "viral_creator", "description": "🎨 Trend-Jacking + 4K Banner + Audio"},
+            {"command": "fb_login", "description": "🔑 ភ្ជាប់ Facebook Account ដោយងាយស្រួល"},
+            {"command": "fb_2fa", "description": "🔐 បញ្ចូលកូដ 2FA របស់ Facebook"},
+            {"command": "fb_pages", "description": "📄 បង្ហាញបញ្ជី Pages & ជ្រើសរើស Page"},
+            {"command": "fb_select", "description": "👉 ជ្រើសរើស Page សកម្មសម្រាប់ Boost"},
+            {"command": "fb_connect", "description": "💡 មគ្គុទ្ទេសក៍ភ្ជាប់ Facebook ងាយៗ"},
+            {"command": "fb_logout", "description": "🚪 ចាកចេញ និងលុប Token ដោយសុវត្ថិភាព"},
+            {"command": "scan", "description": "🔍 ស្កេន Posts & បង្ហាញប៊ូតុង 1-Tap Boost"},
+            {"command": "active", "description": "⚡ បង្ហាញ Active Ads, Spend & ROAS"},
+            {"command": "roas", "description": "📊 ពិន្ទុ ROAS Scorecard & ML Prediction"},
+            {"command": "generate", "description": "🧠 បង្កើត 3 High-Converting Ad Variations"},
+            {"command": "post", "description": "📝 ផុស Caption ផ្ទាល់ទៅកាន់ Facebook Page"},
+            {"command": "comments", "description": "🤖 ពិនិត្យ AI Comment & Messenger Lead Agent"},
+            {"command": "status", "description": "📈 ត្រួតពិនិត្យសុខភាពប្រព័ន្ធ និង Memory"},
+            {"command": "help", "description": "📖 បង្ហាញបញ្ជី Commands ទាំងអស់"}
+        ]
+
+        admin_commands = [
+            {"command": "start", "description": "🚀 បើកផ្ទាំង Dashboard ចម្បង & Status"},
+            {"command": "admin_status", "description": "📊 Institutional VPS, CPU, RAM & Bot Health"},
+            {"command": "admin_users", "description": "👥 បញ្ជី Multi-Tenant Users ទាំងអស់"},
+            {"command": "admin_pages", "description": "📑 បញ្ជី Facebook Pages ទាំងអស់ក្នុងប្រព័ន្ធ"},
+            {"command": "admin_sync", "description": "🔄 បង្ខំ Re-sync Pages ពី Facebook"},
+            {"command": "admin_broadcast", "description": "📢 ផ្ញើសារប្រកាសទៅកាន់ Users ទាំងអស់"},
+            {"command": "autopilot", "description": "🤖 បើក/បិទ Autonomous Engine ២៤/៧"},
+            {"command": "offline_boost", "description": "⚡ បង្កើត 4K Viral Package ($0 Ad Spend)"},
+            {"command": "viral_creator", "description": "🎨 Trend-Jacking + 4K Banner + Audio"},
+            {"command": "scan", "description": "🔍 ស្កេន Posts & បង្ហាញប៊ូតុង 1-Tap Boost"},
+            {"command": "boost", "description": "🚀 បញ្ជា Boost Post ដោយផ្ទាល់ + Budget"},
+            {"command": "active", "description": "⚡ បង្ហាញ Active Ads, Spend & ROAS"},
+            {"command": "roas", "description": "📊 ពិន្ទុ ROAS Scorecard & ML Prediction"},
+            {"command": "fb_pages", "description": "📄 បង្ហាញបញ្ជី Pages & ជ្រើសរើស Page"},
+            {"command": "fb_select", "description": "👉 ជ្រើសរើស Page សកម្មសម្រាប់ Boost"},
+            {"command": "fb_login", "description": "🔑 ភ្ជាប់ Facebook Account ដោយងាយស្រួល"},
+            {"command": "fb_2fa", "description": "🔐 បញ្ចូលកូដ 2FA របស់ Facebook"},
+            {"command": "fb_connect", "description": "💡 មគ្គុទ្ទេសក៍ភ្ជាប់ Facebook ងាយៗ"},
+            {"command": "fb_logout", "description": "🚪 ចាកចេញ និងលុប Token ដោយសុវត្ថិភាព"},
+            {"command": "generate", "description": "🧠 បង្កើត 3 High-Converting Ad Variations"},
+            {"command": "post", "description": "📝 ផុស Caption ផ្ទាល់ទៅកាន់ Facebook Page"},
+            {"command": "comments", "description": "🤖 ពិនិត្យ AI Comment & Messenger Lead Agent"},
+            {"command": "status", "description": "📈 ត្រួតពិនិត្យសុខភាពប្រព័ន្ធ និង Memory"},
+            {"command": "help", "description": "📖 បង្ហាញបញ្ជី Commands ទាំងអស់"}
+        ]
+
+        try:
+            url_cmd = f"{self.api_url}/setMyCommands"
+            # 1. Register Default Scope for Public VIP Users
+            res1 = requests.post(url_cmd, json={"commands": vip_commands, "scope": {"type": "default"}}, timeout=10)
+            if res1.status_code == 200 and res1.json().get("ok"):
+                logger.info("✅ [BM TELEGRAM BOT] Successfully registered VIP commands with Telegram API")
+            else:
+                logger.warning(f"⚠️ Failed to register VIP commands: {res1.text}")
+
+            # 2. Register Chat Scope for Super Admin
+            if self.admin_id:
+                res2 = requests.post(url_cmd, json={"commands": admin_commands, "scope": {"type": "chat", "chat_id": int(self.admin_id)}}, timeout=10)
+                if res2.status_code == 200 and res2.json().get("ok"):
+                    logger.info(f"✅ [BM TELEGRAM BOT] Successfully registered Super Admin commands for chat {self.admin_id}")
+                else:
+                    logger.warning(f"⚠️ Failed to register Admin commands: {res2.text}")
+
+            return True
+        except Exception as e:
+            logger.error(f"Error registering bot commands: {e}")
+            return False
+
     # =========================================================================
     # LONG POLLING ENGINE
     # =========================================================================
@@ -914,6 +1187,7 @@ class BMTelegramBot:
                             self.token = t
                             self.api_url = f"{self.TELEGRAM_API_URL}{self.token}"
                             logger.info("🎉 [BM TELEGRAM BOT] Token loaded from .env! Activating live Telegram long polling...")
+                            self.register_bot_commands()
                             break
                     except Exception:
                         pass
@@ -922,6 +1196,9 @@ class BMTelegramBot:
         print("🤖 [BM TELEGRAM BOT] STARTED 24/7 TELEGRAM LONG POLLING...", flush=True)
         print(f"🔒 Admin Chat ID: {self.admin_id or 'Any User'}", flush=True)
         print("======================================================================", flush=True)
+
+        # Register Dual-Tier commands with Telegram API
+        self.register_bot_commands()
 
         # Notify admin of startup
         self.send_admin_alert("🚀 <b>FB PAGE BM AUTOMATED BOT IS ONLINE!</b>\nServer: Linux Google VPS (24/7 LIVE)")
@@ -953,6 +1230,18 @@ class BMTelegramBot:
                         # Command routing
                         if text in ("/start", "/menu"):
                             self.handle_start(chat_id)
+                        elif text in ("/status", "/health"):
+                            self.handle_status(chat_id)
+                        elif text == "/admin_status":
+                            self.handle_admin_status(chat_id)
+                        elif text == "/admin_users":
+                            self.handle_admin_users(chat_id)
+                        elif text == "/admin_pages":
+                            self.handle_admin_pages(chat_id)
+                        elif text == "/admin_sync":
+                            self.handle_admin_sync(chat_id)
+                        elif text.startswith("/admin_broadcast"):
+                            self.handle_admin_broadcast(chat_id, text)
                         elif text.startswith("/fb_login"):
                             self.handle_fb_login(chat_id, text)
                         elif text.startswith("/fb_2fa"):
@@ -1030,6 +1319,18 @@ class BMTelegramBot:
                     break
                 if cmd in ("/start", "/menu"):
                     self.handle_start("terminal_user")
+                elif cmd in ("/status", "/health"):
+                    self.handle_status("terminal_user")
+                elif cmd == "/admin_status":
+                    self.handle_admin_status("terminal_user")
+                elif cmd == "/admin_users":
+                    self.handle_admin_users("terminal_user")
+                elif cmd == "/admin_pages":
+                    self.handle_admin_pages("terminal_user")
+                elif cmd == "/admin_sync":
+                    self.handle_admin_sync("terminal_user")
+                elif cmd.startswith("/admin_broadcast"):
+                    self.handle_admin_broadcast("terminal_user", cmd)
                 elif cmd.startswith("/fb_login"):
                     self.handle_fb_login("terminal_user", cmd)
                 elif cmd.startswith("/fb_2fa"):
